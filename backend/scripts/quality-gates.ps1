@@ -34,6 +34,22 @@ function Invoke-QualityTool {
     }
 }
 
+function Invoke-PipAudit {
+    param(
+        [string[]]$Arguments = @()
+    )
+
+    if ($pythonCommand -eq "uv") {
+        & uv run pip-audit @Arguments
+    } else {
+        & $pythonCommand -m pip_audit @Arguments
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Quality gate command failed: pip-audit"
+    }
+}
+
 $pythonFiles = Get-ChildItem -Path app, tests, scripts -Recurse -File -Filter *.py -ErrorAction SilentlyContinue
 $hasPythonSources = ($pythonFiles | Measure-Object).Count -gt 0
 
@@ -61,7 +77,7 @@ if ($hasPythonSources) {
 
 if (-not $SkipAudit) {
     Write-Host "[4/5] pip-audit dependency scan" -ForegroundColor Cyan
-    Invoke-QualityTool -Module pip_audit -Arguments @(
+    Invoke-PipAudit -Arguments @(
         "--ignore-vuln",
         "CVE-2024-23342",
         "--ignore-vuln",

@@ -27,6 +27,14 @@ run_quality_tool() {
   fi
 }
 
+run_pip_audit() {
+  if [[ "$RUNNER" == "uv" ]]; then
+    uv run pip-audit "$@"
+  else
+    "$RUNNER" -m pip_audit "$@"
+  fi
+}
+
 HAS_PYTHON_SOURCES=0
 if find app tests scripts -type f -name '*.py' 2>/dev/null | grep -q .; then
   HAS_PYTHON_SOURCES=1
@@ -56,7 +64,7 @@ fi
 
 if [[ "$SKIP_AUDIT" != "1" ]]; then
   echo "[4/5] pip-audit dependency scan"
-  run_quality_tool pip_audit --ignore-vuln CVE-2024-23342 --ignore-vuln CVE-2026-4539
+  run_pip_audit --ignore-vuln CVE-2024-23342 --ignore-vuln CVE-2026-4539
 else
   echo "[4/5] pip-audit skipped"
 fi
