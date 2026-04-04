@@ -30,37 +30,37 @@ Build the backend from scratch in phased increments, with each task tracked as a
 [x] Implement auth endpoints: /api/v1/auth/login, /refresh, /logout, /register-tenant.
 [x] Add CI workflow for lint, security scan, and tests.
 [x] Add Dockerfiles and docker-compose local stack skeleton (postgres, redis, elasticsearch, minio, api).
-[ ] Phase exit criteria: local API boots, migration runs, auth flow works, CI job passes.
+[x] Phase exit criteria: local API boots, migration runs, auth flow works, CI job passes.
 
 3. Phase 2 - Ingestion Pipeline (depends on Step 2)
-[ ] Configure Celery app and queues: collect.queue, parse.queue, analysis.queue, correlate.queue, score.queue, recommend.queue, alert.queue.
-[ ] Implement collector services: IMAP client, attachment decompressor, MinIO uploader.
-[ ] Implement collector worker task with retries and idempotency guard.
-[ ] Implement parser services: safe XML parse (defusedxml), provider normalization, optional schema validation.
-[ ] Implement parser worker task with DB persistence and Elasticsearch indexing.
-[ ] Implement repository layer for report raw/report/report records CRUD and pagination helpers.
-[ ] Implement domains API CRUD + domain policy read route.
-[ ] Implement mailboxes API CRUD + mailbox test + manual trigger endpoint.
-[ ] Implement reports API list/detail/records.
-[ ] Implement records API search/detail/export backed by Elasticsearch queries.
-[ ] Add scheduler (Celery Beat) for periodic mailbox polling.
-[ ] Add Flower monitoring service to local compose stack.
-[ ] Phase exit criteria: collect -> parse -> persist -> index flow works end to end in integration tests.
+[x] Configure Celery app and queues: collect.queue, parse.queue, analysis.queue, correlate.queue, score.queue, recommend.queue, alert.queue.
+[x] Implement collector services: IMAP client, attachment decompressor, MinIO uploader.
+[x] Implement collector worker task with retries and idempotency guard.
+[x] Implement parser services: safe XML parse (defusedxml), provider normalization, optional schema validation.
+[x] Implement parser worker task with DB persistence and Elasticsearch indexing.
+[x] Implement repository layer for report raw/report/report records CRUD and pagination helpers.
+[x] Implement domains API CRUD + domain policy read route.
+[x] Implement mailboxes API CRUD + mailbox test + manual trigger endpoint.
+[x] Implement reports API list/detail/records.
+[x] Implement records API search/detail/export backed by Elasticsearch queries.
+[x] Add scheduler (Celery Beat) for periodic mailbox polling.
+[x] Add Flower monitoring service to local compose stack.
+[x] Phase exit criteria: collect -> parse -> persist -> index flow works end to end in integration tests.
 
 4. Phase 3 - Analysis, Correlation, Scoring (depends on Step 3)
-[ ] Implement alignment analysis module (SPF/DKIM/DMARC alignment and conformance metrics).
-[ ] Implement analysis worker that computes conformance and enqueues downstream tasks.
-[ ] Implement correlation detector rules (repeated failures, volume anomaly, new source, cross-domain spoofing).
-[ ] Implement correlation classifier and incident creation logic.
-[ ] Implement enrichment clients (GeoIP, ASN, AbuseIPDB, VirusTotal) with caching/rate protection.
-[ ] Implement scoring formula and risk state transitions.
-[ ] Implement scoring worker to upsert current score and append history.
-[ ] Implement recommendation analyzers (SPF, DKIM, policy advisor, maturity scorer).
-[ ] Implement recommendation worker to persist recommendations.
-[ ] Implement sources API list/detail/history/records.
-[ ] Implement analytics API (conformance, risk-trend, top-sources, volume, spf-dkim-breakdown).
-[ ] Implement incidents API list/detail/close.
-[ ] Phase exit criteria: analytics and source intelligence endpoints return real computed data.
+[x] Implement alignment analysis module (SPF/DKIM/DMARC alignment and conformance metrics).
+[x] Implement analysis worker that computes conformance and enqueues downstream tasks.
+[x] Implement correlation detector rules (repeated failures, volume anomaly, new source, cross-domain spoofing).
+[x] Implement correlation classifier and incident creation logic.
+[x] Implement enrichment clients (GeoIP, ASN, AbuseIPDB, VirusTotal) with caching/rate protection.
+[x] Implement scoring formula and risk state transitions.
+[x] Implement scoring worker to upsert current score and append history.
+[x] Implement recommendation analyzers (SPF, DKIM, policy advisor, maturity scorer).
+[x] Implement recommendation worker to persist recommendations.
+[x] Implement sources API list/detail/history/records.
+[x] Implement analytics API (conformance, risk-trend, top-sources, volume, spf-dkim-breakdown).
+[x] Implement incidents API list/detail/close.
+[x] Phase exit criteria: analytics and source intelligence endpoints return real computed data.
 
 5. Phase 4 - Alerting, Integrations, Realtime, Hardening (depends on Step 4)
 [ ] Implement alert router with severity-to-channel mapping.
@@ -87,6 +87,32 @@ Build the backend from scratch in phased increments, with each task tracked as a
 [ ] Finalize backend README runbook and API usage notes.
 [ ] Release readiness checklist signed off.
 
+7. Phase 6 - ML Anomaly Detection (post-MVP, depends on Step 6)
+[ ] Define anomaly detection use-cases and labels (source-level, domain-level, time-window level).
+[ ] Implement feature engineering pipeline from parsed records and source history.
+[ ] Build offline training job for baseline unsupervised model (Isolation Forest recommended for v1).
+[ ] Add model artifact/version registry metadata (model_id, feature_version, trained_at, metrics).
+[ ] Implement batch inference worker to score new report records and emit anomaly signals.
+[ ] Add anomaly score storage schema and history retention policy.
+[ ] Add fallback logic to rules-only scoring when model is unavailable or stale.
+[ ] Add drift monitoring and scheduled retraining policy.
+[ ] Add tenant-level feature flag for controlled rollout of ML scoring.
+[ ] Add evaluation suite (precision/recall proxy metrics + false positive review workflow).
+[ ] Phase exit criteria: offline metrics documented, inference stable in staging, and rollback path validated.
+
+8. Phase 7 - Model Implementation in Platform (post-MVP, depends on Step 7)
+[ ] Implement model loading service with strict model/version compatibility checks.
+[ ] Implement online inference endpoint/service contract for anomaly scoring requests.
+[ ] Integrate model inference into existing analysis/scoring pipeline with timeout and circuit-breaker guards.
+[ ] Add prediction persistence (score, confidence, model_id, feature_version, inference_timestamp).
+[ ] Expose anomaly results in analytics/reporting APIs and tenant dashboards.
+[ ] Add real-time anomaly event publishing into alert pipeline with severity mapping.
+[ ] Add tenant-level rollout controls (enable/disable, percentage rollout, canary tenants).
+[ ] Implement platform fallback behavior when inference service is degraded (rules-only path).
+[ ] Add observability for inference latency, error rate, throughput, and model-specific health.
+[ ] Implement rollback playbook for model/version revert without service downtime.
+[ ] Phase exit criteria: model is fully integrated in platform flows, SLOs are met in staging, and rollback is validated.
+
 **Parallelism and Dependencies**
 1. Can run in parallel after Phase 1 core is stable: CI pipeline setup, Docker compose hardening, and API schema definitions.
 2. Can run in parallel during Phase 2: domains/mailboxes APIs and parser normalization tests.
@@ -110,5 +136,6 @@ Build the backend from scratch in phased increments, with each task tracked as a
 
 **Decisions**
 - Included scope: backend API, workers, data model, observability, security controls, local dev stack, and staging deployment manifests.
-- Excluded for MVP: forensic RUF deep analysis, billing, full SOAR automation, advanced ML anomaly models.
+- Excluded for MVP: forensic RUF deep analysis, billing, and full SOAR automation.
+- Post-MVP planned scope: ML anomaly detection and model lifecycle in Phase 6.
 - Progress tracking rule: this checklist is the live execution tracker for the implementation agent.

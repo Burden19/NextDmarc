@@ -4,6 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.analytics import router as analytics_router
+from app.api.v1.domains import router as domains_router
+from app.api.v1.incidents import router as incidents_router
+from app.api.v1.mailboxes import router as mailboxes_router
+from app.api.v1.records import router as records_router
+from app.api.v1.reports import router as reports_router
+from app.api.v1.sources import router as sources_router
 from app.core.config import get_settings
 from app.core.exceptions import (
     AppError,
@@ -48,6 +55,13 @@ def create_app() -> FastAPI:
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
     app.include_router(auth_router, prefix=settings.api_prefix)
+    app.include_router(domains_router, prefix=settings.api_prefix)
+    app.include_router(mailboxes_router, prefix=settings.api_prefix)
+    app.include_router(reports_router, prefix=settings.api_prefix)
+    app.include_router(records_router, prefix=settings.api_prefix)
+    app.include_router(sources_router, prefix=settings.api_prefix)
+    app.include_router(analytics_router, prefix=settings.api_prefix)
+    app.include_router(incidents_router, prefix=settings.api_prefix)
 
     @app.get("/", tags=["system"])
     async def root() -> dict[str, str]:
