@@ -1,3 +1,4 @@
+import secrets
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
@@ -39,6 +40,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not plain_password or not hashed_password:
         return False
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def generate_csrf_token() -> str:
+    return secrets.token_urlsafe(32)
 
 
 def create_token(

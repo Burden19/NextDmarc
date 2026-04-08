@@ -17,7 +17,9 @@ def _build_score_store() -> ScoreStore:
 
 
 def _retry_delay_seconds(retry_count: int) -> int:
-    return min(300, 10 * (2**retry_count))
+    bounded_retry = retry_count if retry_count >= 0 else 0
+    delay = 10 * (2**bounded_retry)
+    return 300 if delay > 300 else delay
 
 
 @celery_app.task(bind=True, name="app.workers.tasks.score.compute_score", max_retries=5)

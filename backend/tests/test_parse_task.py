@@ -96,8 +96,7 @@ def test_parse_task_pipeline_reads_parses_persists_and_indexes(monkeypatch) -> N
     )
 
     assert (
-        reader.requested_object_name
-        == "tenants/tenant-1/mailboxes/mbx/messages/100/001_report.xml"
+        reader.requested_object_name == "tenants/tenant-1/mailboxes/mbx/messages/100/001_report.xml"
     )
     assert parser.seen_payload == b"<feedback/>"
     assert persister.last_tenant_id == "tenant-1"

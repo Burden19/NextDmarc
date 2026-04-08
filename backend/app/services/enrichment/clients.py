@@ -227,7 +227,18 @@ def _as_str(value: object) -> str | None:
 def _as_int(value: object) -> int | None:
     if value is None:
         return None
-    try:
+    if isinstance(value, bool):
         return int(value)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return None
+        try:
+            return int(candidate)
+        except ValueError:
+            return None
+    return None

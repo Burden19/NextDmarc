@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import TenantContext, get_tenant_context
 from app.core.exceptions import AppError
 from app.repositories.record_repository import RecordRepository
-from app.repositories.report_repository import ReportRepository
+from app.repositories.report_repository import ReportEntity, ReportRepository
 from app.schemas.records import PaginatedRecordsResponse
 from app.schemas.reports import PaginatedReportsResponse, ReportResponse
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 tenant_context_dep = Depends(get_tenant_context)
 
 
-def _to_report_response(item) -> ReportResponse:
+def _to_report_response(item: ReportEntity) -> ReportResponse:
     return ReportResponse(
         id=item.id,
         tenant_id=item.tenant_id,

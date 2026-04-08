@@ -4,8 +4,8 @@ from enum import StrEnum
 from ipaddress import ip_address
 from typing import Literal
 
-from defusedxml import ElementTree as SafeElementTree
-from defusedxml.common import DefusedXmlException
+from defusedxml import ElementTree as SafeElementTree  # type: ignore[import-untyped]
+from defusedxml.common import DefusedXmlException  # type: ignore[import-untyped]
 
 
 class DmarcParserError(Exception):
@@ -111,9 +111,7 @@ class DmarcParser:
             if record_node.find("row/count") is None:
                 raise DmarcParserError("Schema validation failed: missing 'row/count'")
             if record_node.find("row/policy_evaluated") is None:
-                raise DmarcParserError(
-                    "Schema validation failed: missing 'row/policy_evaluated'"
-                )
+                raise DmarcParserError("Schema validation failed: missing 'row/policy_evaluated'")
 
     def _parse_record(self, record_node: SafeElementTree.Element) -> DmarcParsedRecord:
         row = _required_child(record_node, "row")
@@ -196,9 +194,11 @@ def _required_epoch(node: SafeElementTree.Element, name: str) -> int:
 
 def _required_result(node: SafeElementTree.Element, name: str) -> Literal["pass", "fail"]:
     value = _required_text(node, name).lower()
-    if value not in {"pass", "fail"}:
-        raise DmarcParserError(f"Element '{name}' must be either 'pass' or 'fail'")
-    return value
+    if value == "pass":
+        return "pass"
+    if value == "fail":
+        return "fail"
+    raise DmarcParserError(f"Element '{name}' must be either 'pass' or 'fail'")
 
 
 def _validate_ip(value: str) -> None:

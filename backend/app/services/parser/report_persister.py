@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session_factory
 from app.services.parser.dmarc_parser import DmarcParsedReport
@@ -46,7 +47,7 @@ class ReportPersister:
             await session.commit()
             return report_id
 
-    async def _ensure_domain(self, *, session, tenant_id: UUID, fqdn: str) -> str:
+    async def _ensure_domain(self, *, session: AsyncSession, tenant_id: UUID, fqdn: str) -> str:
         domain_id = str(uuid4())
         result = await session.execute(
             text(
@@ -70,7 +71,7 @@ class ReportPersister:
     async def _upsert_report(
         self,
         *,
-        session,
+        session: AsyncSession,
         tenant_id: UUID,
         domain_id: str,
         parsed: DmarcParsedReport,

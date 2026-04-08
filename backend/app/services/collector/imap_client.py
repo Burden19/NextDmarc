@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from app.core.config import Settings, get_settings
 
@@ -73,16 +73,22 @@ class ImapClient:
         from aioimaplib import aioimaplib
 
         if self._settings.imap_use_ssl:
-            return aioimaplib.IMAP4_SSL(
+            return cast(
+                ImapConnection,
+                aioimaplib.IMAP4_SSL(
+                    host=self._settings.imap_host,
+                    port=self._settings.imap_port,
+                    timeout=self._settings.imap_timeout_seconds,
+                ),
+            )
+
+        return cast(
+            ImapConnection,
+            aioimaplib.IMAP4(
                 host=self._settings.imap_host,
                 port=self._settings.imap_port,
                 timeout=self._settings.imap_timeout_seconds,
-            )
-
-        return aioimaplib.IMAP4(
-            host=self._settings.imap_host,
-            port=self._settings.imap_port,
-            timeout=self._settings.imap_timeout_seconds,
+            ),
         )
 
     def _parse_uid_list(self, data: list[bytes]) -> list[str]:

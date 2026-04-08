@@ -23,7 +23,7 @@ class AnalyticsService:
 
         for item in records:
             nested = _record(item)
-            count = int(nested.get("count", 1))
+            count = _as_int(nested.get("count"), default=1)
             total += count
             if str(nested.get("dkim", "fail")).lower() == "pass":
                 dkim_pass += count
@@ -63,7 +63,7 @@ class AnalyticsService:
             source_ip = str(nested.get("source_ip", "")).strip()
             if not source_ip:
                 continue
-            totals[source_ip] += int(nested.get("count", 1))
+            totals[source_ip] += _as_int(nested.get("count"), default=1)
 
         top = sorted(totals.items(), key=lambda pair: pair[1], reverse=True)[:limit]
         return {
@@ -83,7 +83,7 @@ class AnalyticsService:
 
         for item in records:
             nested = _record(item)
-            count = int(nested.get("count", 1))
+            count = _as_int(nested.get("count"), default=1)
             total += count
             domain = str(nested.get("header_from", "unknown")).strip().lower() or "unknown"
             by_domain[domain] += count
@@ -103,18 +103,18 @@ class AnalyticsService:
             ],
         }
 
-    async def spf_dkim_breakdown(self, *, tenant_id: str) -> dict[str, object]:
+    async def spf_dkim_breakdown(self, *, tenant_id: str) -> dict[str, int]:
         records = await self._all_records(tenant_id=tenant_id)
-        buckets = {
-            "spf_pass_dkim_pass": 0,
-            "spf_pass_dkim_fail": 0,
-            "spf_fail_dkim_pass": 0,
+        buckets: dict[str, int] = {
+            "spf_pass_dkim_pass": 0,  # nosec B105
+            "spf_pass_dkim_fail": 0,  # nosec B105
+            "spf_fail_dkim_pass": 0,  # nosec B105
             "spf_fail_dkim_fail": 0,
         }
 
         for item in records:
             nested = _record(item)
-            count = int(nested.get("count", 1))
+            count = _as_int(nested.get("count"), default=1)
             spf_pass = str(nested.get("spf", "fail")).lower() == "pass"
             dkim_pass = str(nested.get("dkim", "fail")).lower() == "pass"
 
@@ -144,3 +144,21 @@ def _record(item: dict[str, object]) -> dict[str, object]:
     if not isinstance(nested, dict):
         return {}
     return nested
+
+
+def _as_int(value: object, *, default: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return default
+        try:
+            return int(candidate)
+        except ValueError:
+            return default
+    return default

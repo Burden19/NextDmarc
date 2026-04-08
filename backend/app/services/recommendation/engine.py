@@ -27,8 +27,7 @@ class RecommendationEngine:
                     code="spf_alignment_hardening",
                     title="Improve SPF Coverage",
                     detail=(
-                        "SPF pass rate is below 95 percent; review includes "
-                        "and sender inventory."
+                        "SPF pass rate is below 95 percent; review includes and sender inventory."
                     ),
                     severity="medium",
                 )
@@ -83,12 +82,7 @@ class RecommendationEngine:
         dmarc_rate: float,
         conformance_rate: float,
     ) -> int:
-        score = (
-            spf_rate * 25.0
-            + dkim_rate * 25.0
-            + dmarc_rate * 25.0
-            + conformance_rate * 25.0
-        )
+        score = spf_rate * 25.0 + dkim_rate * 25.0 + dmarc_rate * 25.0 + conformance_rate * 25.0
         return int(round(max(0.0, min(100.0, score))))
 
     def _maturity_level(self, score: int) -> str:

@@ -1,34 +1,57 @@
-import { Grid, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import { Alert, Grid, Typography } from "@mui/material";
 import AppLayout from "components/AppLayout";
 import SectionCard from "components/SectionCard";
 import DataTable from "components/DataTable";
-
-const scoringRows = [
-  {
-    id: "score-1",
-    source: "198.51.100.24",
-    score: "82",
-    classification: "Malicious"
-  },
-  {
-    id: "score-2",
-    source: "203.0.113.88",
-    score: "54",
-    classification: "Suspicious"
-  },
-  {
-    id: "score-3",
-    source: "192.0.2.9",
-    score: "21",
-    classification: "Legitimate"
-  }
-];
+import { apiRequest } from "lib/apiClient";
 
 export default function Scoring() {
+  const [rows, setRows] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadScoring = async () => {
+      setIsLoading(true);
+      setError("");
+      try {
+        const response = await apiRequest("/analytics/risk-trend");
+        if (!isMounted) {
+          return;
+        }
+
+        setRows(
+          (response?.points || []).map((point) => ({
+            id: point.at,
+            source: new Date(point.at).toLocaleString(),
+            score: String(point.score),
+            status: String(point.risk_state || "unknown")
+          }))
+        );
+      } catch (requestError) {
+        if (!isMounted) {
+          return;
+        }
+        setError(requestError instanceof Error ? requestError.message : "Failed to load scoring data");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadScoring();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const columns = [
-    { key: "source", label: "Source" },
+    { key: "source", label: "Captured At" },
     { key: "score", label: "Risk Score" },
-    { key: "classification", label: "Classification" }
+    { key: "status", label: "Risk State" }
   ];
 
   return (
@@ -36,7 +59,13 @@ export default function Scoring() {
       <Grid container spacing={3}>
         <Grid item xs={12} md={7}>
           <SectionCard title="Risk Scoring" subtitle="Enrichment + history">
-            <DataTable columns={columns} rows={scoringRows} />
+            {isLoading ? (
+              <Typography variant="body2" color="text.secondary">
+                Loading risk trend...
+              </Typography>
+            ) : (
+              <DataTable columns={columns} rows={rows} />
+            )}
           </SectionCard>
         </Grid>
         <Grid item xs={12} md={5}>
@@ -47,6 +76,11 @@ export default function Scoring() {
             </Typography>
           </SectionCard>
         </Grid>
+        {error ? (
+          <Grid item xs={12}>
+            <Alert severity="error">{error}</Alert>
+          </Grid>
+        ) : null}
       </Grid>
     </AppLayout>
   );

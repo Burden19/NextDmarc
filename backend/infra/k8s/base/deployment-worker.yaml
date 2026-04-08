@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextdmarc-worker
+  namespace: nextdmarc
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nextdmarc-worker
+  template:
+    metadata:
+      labels:
+        app: nextdmarc-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/example/nextdmarc-backend:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.workers.celery_app.celery_app
+            - worker
+            - --loglevel=INFO
+          envFrom:
+            - configMapRef:
+                name: nextdmarc-backend-config
+            - secretRef:
+                name: nextdmarc-backend-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"

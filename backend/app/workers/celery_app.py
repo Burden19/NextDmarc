@@ -27,6 +27,7 @@ celery_app = Celery(
         "app.workers.tasks.correlate",
         "app.workers.tasks.score",
         "app.workers.tasks.recommend",
+        "app.workers.tasks.alert",
     ],
 )
 

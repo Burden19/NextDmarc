@@ -1,3 +1,4 @@
+import builtins
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -51,7 +52,7 @@ class InMemoryMailboxStore:
     def list(self, *, tenant_id: UUID) -> list[MailboxRecord]:
         return [item for item in self._records.values() if item.tenant_id == tenant_id]
 
-    def list_enabled(self) -> list[MailboxRecord]:
+    def list_enabled(self) -> builtins.list[MailboxRecord]:
         return [item for item in self._records.values() if item.enabled]
 
     def get(self, *, tenant_id: UUID, mailbox_id: UUID) -> MailboxRecord | None:

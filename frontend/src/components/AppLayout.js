@@ -5,6 +5,7 @@ import TopBar from "components/TopBar";
 import SideNav from "components/SideNav";
 import { getDefaultRouteForRole, isRouteAllowed, roleLabels } from "access/roles";
 import { useLanguage } from "i18n/LanguageContext";
+import { getAuthSession, logoutAuthSession } from "lib/authSession";
 
 const drawerWidth = 260;
 
@@ -19,13 +20,13 @@ export default function AppLayout({ title, children }) {
       return;
     }
 
-    const storedRole = window.localStorage.getItem("nextdmarc_role");
-    if (!storedRole) {
+    const session = getAuthSession();
+    if (!session || !session.role) {
       router.push("/login");
       return;
     }
 
-    setRole(storedRole);
+    setRole(session.role);
   }, [router]);
 
   useEffect(() => {
@@ -50,11 +51,10 @@ export default function AppLayout({ title, children }) {
     return t(`pages.${router.pathname}`, title);
   }, [router.pathname, t, title]);
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("nextdmarc_role");
-      router.push("/login");
-    }
+  const handleLogout = async () => {
+    await logoutAuthSession();
+    setRole(null);
+    router.push("/login");
   };
 
   if (!role) {

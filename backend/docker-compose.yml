@@ -74,6 +74,24 @@ services:
       ENVIRONMENT: development
       API_PREFIX: /api/v1
       DATABASE_URL: postgresql+asyncpg://nextdmarc:nextdmarc@postgres:5432/nextdmarc
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      TRUSTED_HOSTS: localhost,127.0.0.1
+      CORS_ALLOW_CREDENTIALS: "true"
+      CORS_ALLOWED_METHODS: GET,POST,PUT,PATCH,DELETE,OPTIONS
+      CORS_ALLOWED_HEADERS: Authorization,Content-Type,X-Tenant-ID,X-Role,X-Request-ID,X-CSRF-Token
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: lax
+      COOKIE_DOMAIN: ""
+      AUTH_COOKIE_ENABLED: "true"
+      AUTH_REFRESH_COOKIE_NAME: nextdmarc_refresh_token
+      AUTH_CSRF_COOKIE_NAME: nextdmarc_csrf_token
+      AUTH_CSRF_HEADER_NAME: X-CSRF-Token
+      AUTH_REFRESH_COOKIE_PATH: /
+      AUTH_CSRF_COOKIE_PATH: /
+      AUTH_ALLOW_REFRESH_TOKEN_BODY_FALLBACK: "true"
+      LOGIN_MAX_ATTEMPTS: "5"
+      LOGIN_LOCKOUT_SECONDS: "900"
+      LOGIN_WINDOW_SECONDS: "60"
     ports:
       - "8000:8000"
     depends_on:

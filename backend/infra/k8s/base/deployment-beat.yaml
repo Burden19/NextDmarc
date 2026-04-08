@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextdmarc-beat
+  namespace: nextdmarc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nextdmarc-beat
+  template:
+    metadata:
+      labels:
+        app: nextdmarc-beat
+    spec:
+      containers:
+        - name: beat
+          image: ghcr.io/example/nextdmarc-backend:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.workers.celery_app.celery_app
+            - beat
+            - --loglevel=INFO
+          envFrom:
+            - configMapRef:
+                name: nextdmarc-backend-config
+            - secretRef:
+                name: nextdmarc-backend-secrets

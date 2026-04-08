@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useRouter } from "next/router";
 import {
+  Alert,
   Avatar,
   Box,
   Button,
@@ -9,43 +11,94 @@ import {
   Divider,
   Grid,
   Stack,
+  TextField,
   Typography
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import LoginIcon from "@mui/icons-material/Login";
 import { getDefaultRouteForRole, roleLabels } from "access/roles";
-
-const roles = [
-  {
-    id: "nextstep_admin",
-    description: "Full platform access, tenant governance, and security controls.",
-    access: "All modules: governance, integrations, settings, analytics"
-  },
-  {
-    id: "client_admin",
-    description: "Manage domains, policies, integrations, and onboarding.",
-    access: "Domain lifecycle, integrations, compliance operations"
-  },
-  {
-    id: "analyst_soc",
-    description: "Monitor alerts, investigate anomalies, and respond.",
-    access: "Operational dashboard, alerts, scoring, recommendations"
-  },
-  {
-    id: "client_user",
-    description: "Read dashboards, compliance, and risk summaries.",
-    access: "Read-only reporting and posture visibility"
-  }
-];
+import { loginWithPassword, registerTenantAdmin } from "lib/authSession";
 
 export default function Login() {
   const router = useRouter();
+  const [loginForm, setLoginForm] = useState({
+    tenantId: "",
+    email: "",
+    password: ""
+  });
+  const [registerForm, setRegisterForm] = useState({
+    tenantName: "",
+    adminEmail: "",
+    adminPassword: ""
+  });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [registerError, setRegisterError] = useState("");
+  const [registerSuccess, setRegisterSuccess] = useState("");
 
-  const handleLogin = (roleId) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("nextdmarc_role", roleId);
-      router.push(getDefaultRouteForRole(roleId));
+  const handleLoginChange = (field) => (event) => {
+    setLoginForm((previous) => ({
+      ...previous,
+      [field]: event.target.value
+    }));
+  };
+
+  const handleRegisterChange = (field) => (event) => {
+    setRegisterForm((previous) => ({
+      ...previous,
+      [field]: event.target.value
+    }));
+  };
+
+  const handleLogin = async () => {
+    setLoginError("");
+    setIsLoggingIn(true);
+
+    try {
+      const session = await loginWithPassword({
+        tenant_id: loginForm.tenantId.trim(),
+        email: loginForm.email.trim().toLowerCase(),
+        password: loginForm.password
+      });
+
+      router.push(getDefaultRouteForRole(session.role));
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Login failed");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setRegisterError("");
+    setRegisterSuccess("");
+    setIsRegistering(true);
+
+    try {
+      const response = await registerTenantAdmin({
+        tenant_name: registerForm.tenantName.trim(),
+        admin_email: registerForm.adminEmail.trim().toLowerCase(),
+        admin_password: registerForm.adminPassword
+      });
+
+      const tenantId = String(response?.tenant_id || "");
+      const role = String(response?.role || "");
+
+      setLoginForm((previous) => ({
+        ...previous,
+        tenantId,
+        email: registerForm.adminEmail.trim().toLowerCase()
+      }));
+
+      setRegisterSuccess(
+        `Tenant created successfully. Tenant ID: ${tenantId}. Role: ${roleLabels[role] || role}.`
+      );
+    } catch (error) {
+      setRegisterError(error instanceof Error ? error.message : "Tenant registration failed");
+    } finally {
+      setIsRegistering(false);
     }
   };
 
@@ -144,53 +197,97 @@ export default function Login() {
             <Grid item xs={12} md={7}>
               <Box sx={{ p: { xs: 3, md: 4 } }}>
                 <Typography variant="h5" sx={{ color: "primary.dark", mb: 0.5 }}>
-                  Login with mock accounts
+                  Login to backend
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Select one account to load permissions and navigation for that role.
+                  Use tenant credentials to open a real backend-backed session.
                 </Typography>
 
-                <Grid container spacing={2}>
-                  {roles.map((role) => (
-                    <Grid item xs={12} sm={6} key={role.id}>
-                      <Card
-                        elevation={0}
-                        sx={{
-                          height: "100%",
-                          border: "1px solid",
-                          borderColor: "divider",
-                          transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                          "&:hover": {
-                            transform: "translateY(-2px)",
-                            boxShadow: "0 12px 24px rgba(10, 47, 98, 0.12)"
-                          }
-                        }}
-                      >
-                        <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-                          <Typography variant="subtitle1" sx={{ mb: 0.5 }}>
-                            {roleLabels[role.id]}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                            {role.description}
-                          </Typography>
-                          <Divider sx={{ mb: 1.5 }} />
-                          <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
-                            Access scope: {role.access}
-                          </Typography>
-                          <Box sx={{ mt: "auto" }}>
-                            <Button
-                              fullWidth
-                              variant="contained"
-                              endIcon={<LoginIcon />}
-                              onClick={() => handleLogin(role.id)}
-                            >
-                              Enter as {roleLabels[role.id]}
-                            </Button>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
+                <Grid container spacing={2.2}>
+                  <Grid item xs={12}>
+                    <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>
+                      <CardContent sx={{ display: "grid", gap: 1.6 }}>
+                        <Typography variant="subtitle1">Login</Typography>
+                        {loginError ? <Alert severity="error">{loginError}</Alert> : null}
+                        <TextField
+                          label="Tenant ID"
+                          value={loginForm.tenantId}
+                          onChange={handleLoginChange("tenantId")}
+                          size="small"
+                          fullWidth
+                        />
+                        <TextField
+                          label="Email"
+                          value={loginForm.email}
+                          onChange={handleLoginChange("email")}
+                          size="small"
+                          type="email"
+                          fullWidth
+                        />
+                        <TextField
+                          label="Password"
+                          value={loginForm.password}
+                          onChange={handleLoginChange("password")}
+                          size="small"
+                          type="password"
+                          fullWidth
+                        />
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          endIcon={<LoginIcon />}
+                          onClick={handleLogin}
+                          disabled={isLoggingIn}
+                        >
+                          {isLoggingIn ? "Signing in..." : "Sign in"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>
+                      <CardContent sx={{ display: "grid", gap: 1.6 }}>
+                        <Typography variant="subtitle1">Register Tenant Admin</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Use this once to create a tenant and seed the first admin account.
+                        </Typography>
+                        {registerError ? <Alert severity="error">{registerError}</Alert> : null}
+                        {registerSuccess ? <Alert severity="success">{registerSuccess}</Alert> : null}
+                        <TextField
+                          label="Tenant Name"
+                          value={registerForm.tenantName}
+                          onChange={handleRegisterChange("tenantName")}
+                          size="small"
+                          fullWidth
+                        />
+                        <TextField
+                          label="Admin Email"
+                          value={registerForm.adminEmail}
+                          onChange={handleRegisterChange("adminEmail")}
+                          size="small"
+                          type="email"
+                          fullWidth
+                        />
+                        <TextField
+                          label="Admin Password"
+                          value={registerForm.adminPassword}
+                          onChange={handleRegisterChange("adminPassword")}
+                          size="small"
+                          type="password"
+                          fullWidth
+                        />
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={handleRegister}
+                          disabled={isRegistering}
+                        >
+                          {isRegistering ? "Creating tenant..." : "Create Tenant Admin"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 </Grid>
               </Box>
             </Grid>

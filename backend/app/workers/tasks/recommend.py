@@ -17,7 +17,9 @@ def _build_recommendation_store() -> RecommendationStore:
 
 
 def _retry_delay_seconds(retry_count: int) -> int:
-    return min(300, 10 * (2**retry_count))
+    bounded_retry = retry_count if retry_count >= 0 else 0
+    delay = 10 * (2**bounded_retry)
+    return 300 if delay > 300 else delay
 
 
 @celery_app.task(
@@ -36,9 +38,7 @@ def generate_recommendations(
         raise self.retry(exc=exc, countdown=countdown) from exc
 
 
-async def _generate_recommendations_async(
-    *, payload: dict[str, Any]
-) -> dict[str, int | str]:
+async def _generate_recommendations_async(*, payload: dict[str, Any]) -> dict[str, int | str]:
     tenant_id = str(payload.get("tenant_id", ""))
     report_db_id = str(payload.get("report_db_id", ""))
 

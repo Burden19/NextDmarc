@@ -4,7 +4,7 @@ import pytest
 from app.repositories.pagination import Page
 from app.services.correlation.classifier import CorrelationClassification
 from app.services.correlation.detector import CorrelationSignal
-from app.services.correlation.incident_creator import IncidentCreator
+from app.services.correlation.incident_creator import CreatedIncident, IncidentCreator
 from app.workers.tasks import correlate as correlate_module
 
 
@@ -47,6 +47,30 @@ class FakeIncidentCreator:
         return len(classifications)
 
 
+class FakeIncidentCreatorWithDetails(IncidentCreator):
+    async def create_incidents_with_details(
+        self,
+        *,
+        tenant_id: str,
+        classifications,
+    ) -> list[CreatedIncident]:
+        _ = classifications
+        return [
+            CreatedIncident(
+                id="alert-created-1",
+                tenant_id=tenant_id,
+                severity="high",
+                message="Volume anomaly",
+            ),
+            CreatedIncident(
+                id="alert-created-2",
+                tenant_id=tenant_id,
+                severity="medium",
+                message="New source",
+            ),
+        ]
+
+
 def test_correlate_task_detects_and_creates_incidents(monkeypatch) -> None:
     monkeypatch.setattr(correlate_module, "_build_record_repository", FakeRecordRepository)
     monkeypatch.setattr(correlate_module, "_build_incident_creator", FakeIncidentCreator)
@@ -63,6 +87,36 @@ def test_correlate_task_detects_and_creates_incidents(monkeypatch) -> None:
 
     assert result["signals_detected"] >= 2
     assert result["incidents_created"] >= 2
+
+
+def test_correlate_task_enqueues_alert_dispatch_jobs(monkeypatch) -> None:
+    sent_tasks: list[tuple[str, dict[str, str]]] = []
+
+    def fake_send_task(name: str, kwargs: dict[str, str]) -> None:
+        sent_tasks.append((name, kwargs))
+
+    monkeypatch.setattr(correlate_module, "_build_record_repository", FakeRecordRepository)
+    monkeypatch.setattr(
+        correlate_module,
+        "_build_incident_creator",
+        FakeIncidentCreatorWithDetails,
+    )
+    monkeypatch.setattr(correlate_module.celery_app, "send_task", fake_send_task)
+
+    result = asyncio.run(
+        correlate_module._detect_correlations_async(
+            payload={
+                "tenant_id": "tenant-1",
+                "report_db_id": "report-db-1",
+                "total_records": 120,
+            }
+        )
+    )
+
+    assert result["incidents_created"] == 2
+    assert result["alerts_enqueued"] == 2
+    assert sent_tasks[0][0] == "app.workers.tasks.alert.dispatch_existing_alert"
+    assert sent_tasks[0][1]["alert_id"] == "alert-created-1"
 
 
 class FakeResult:

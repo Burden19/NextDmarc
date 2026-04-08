@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, Response, status
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError
@@ -14,6 +14,7 @@ from app.core.security import (
     TokenType,
     create_token,
     decode_token,
+    generate_csrf_token,
     hash_password,
     verify_password,
 )
@@ -27,6 +28,12 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+AUTH_RATE_LIMIT_ERROR_CODE = "auth_rate_limited"
+AUTH_COOKIE_ERROR_CODE = "auth_cookie_error"
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 @dataclass(slots=True)
@@ -99,9 +106,183 @@ class InMemoryAuthStore:
         return jti in self._revoked_refresh_jti
 
 
+class AuthAttemptTracker:
+    def __init__(self) -> None:
+        self._login_failures: dict[str, list[datetime]] = {}
+        self._login_lockouts: dict[str, datetime] = {}
+        self._register_attempts: dict[str, list[datetime]] = {}
+        self._register_lockouts: dict[str, datetime] = {}
+
+    @staticmethod
+    def _normalize_identifier(value: str) -> str:
+        normalized = value.strip().lower()
+        return normalized or "unknown"
+
+    @staticmethod
+    def _normalize_client_ip(client_ip: str | None) -> str:
+        normalized = (client_ip or "unknown").strip()
+        return normalized or "unknown"
+
+    @staticmethod
+    def _remaining_seconds(*, until: datetime, now: datetime) -> int:
+        return max(1, int((until - now).total_seconds()))
+
+    @staticmethod
+    def _prune_attempts(
+        *,
+        attempts: list[datetime],
+        now: datetime,
+        window_seconds: int,
+    ) -> list[datetime]:
+        window_start = now - timedelta(seconds=window_seconds)
+        return [attempt for attempt in attempts if attempt >= window_start]
+
+    def _consume_lockout(
+        self,
+        *,
+        lockouts: dict[str, datetime],
+        scope_key: str,
+        now: datetime,
+    ) -> int | None:
+        lockout_until = lockouts.get(scope_key)
+        if lockout_until is None:
+            return None
+
+        if lockout_until <= now:
+            lockouts.pop(scope_key, None)
+            return None
+
+        return self._remaining_seconds(until=lockout_until, now=now)
+
+    def _record_attempt(
+        self,
+        *,
+        attempts: dict[str, list[datetime]],
+        lockouts: dict[str, datetime],
+        scope_key: str,
+        now: datetime,
+        max_attempts: int,
+        window_seconds: int,
+        lockout_seconds: int,
+    ) -> int | None:
+        active_attempts = self._prune_attempts(
+            attempts=attempts.get(scope_key, []),
+            now=now,
+            window_seconds=window_seconds,
+        )
+        active_attempts.append(now)
+        attempts[scope_key] = active_attempts
+
+        if len(active_attempts) < max_attempts:
+            return None
+
+        lockouts[scope_key] = now + timedelta(seconds=lockout_seconds)
+        attempts.pop(scope_key, None)
+        return lockout_seconds
+
+    def _login_scope_key(self, *, tenant_id: UUID, email: str, client_ip: str | None) -> str:
+        normalized_email = self._normalize_identifier(email)
+        normalized_ip = self._normalize_client_ip(client_ip)
+        return f"{tenant_id}:{normalized_email}:{normalized_ip}"
+
+    def _register_scope_key(self, *, email: str, client_ip: str | None) -> str:
+        normalized_email = self._normalize_identifier(email)
+        normalized_ip = self._normalize_client_ip(client_ip)
+        return f"{normalized_email}:{normalized_ip}"
+
+    def login_retry_after_seconds(
+        self,
+        *,
+        tenant_id: UUID,
+        email: str,
+        client_ip: str | None,
+    ) -> int | None:
+        scope_key = self._login_scope_key(tenant_id=tenant_id, email=email, client_ip=client_ip)
+        return self._consume_lockout(
+            lockouts=self._login_lockouts,
+            scope_key=scope_key,
+            now=_utcnow(),
+        )
+
+    def record_login_failure(
+        self,
+        *,
+        settings: Settings,
+        tenant_id: UUID,
+        email: str,
+        client_ip: str | None,
+    ) -> int | None:
+        now = _utcnow()
+        scope_key = self._login_scope_key(tenant_id=tenant_id, email=email, client_ip=client_ip)
+
+        lockout_remaining = self._consume_lockout(
+            lockouts=self._login_lockouts,
+            scope_key=scope_key,
+            now=now,
+        )
+        if lockout_remaining is not None:
+            return lockout_remaining
+
+        return self._record_attempt(
+            attempts=self._login_failures,
+            lockouts=self._login_lockouts,
+            scope_key=scope_key,
+            now=now,
+            max_attempts=settings.login_max_attempts,
+            window_seconds=settings.login_window_seconds,
+            lockout_seconds=settings.login_lockout_seconds,
+        )
+
+    def reset_login_failures(self, *, tenant_id: UUID, email: str, client_ip: str | None) -> None:
+        scope_key = self._login_scope_key(tenant_id=tenant_id, email=email, client_ip=client_ip)
+        self._login_failures.pop(scope_key, None)
+        self._login_lockouts.pop(scope_key, None)
+
+    def register_retry_after_seconds(self, *, email: str, client_ip: str | None) -> int | None:
+        scope_key = self._register_scope_key(email=email, client_ip=client_ip)
+        return self._consume_lockout(
+            lockouts=self._register_lockouts,
+            scope_key=scope_key,
+            now=_utcnow(),
+        )
+
+    def record_register_attempt(
+        self,
+        *,
+        settings: Settings,
+        email: str,
+        client_ip: str | None,
+    ) -> int | None:
+        now = _utcnow()
+        scope_key = self._register_scope_key(email=email, client_ip=client_ip)
+
+        lockout_remaining = self._consume_lockout(
+            lockouts=self._register_lockouts,
+            scope_key=scope_key,
+            now=now,
+        )
+        if lockout_remaining is not None:
+            return lockout_remaining
+
+        return self._record_attempt(
+            attempts=self._register_attempts,
+            lockouts=self._register_lockouts,
+            scope_key=scope_key,
+            now=now,
+            max_attempts=settings.login_max_attempts,
+            window_seconds=settings.login_window_seconds,
+            lockout_seconds=settings.login_lockout_seconds,
+        )
+
+
 @lru_cache(maxsize=1)
 def get_auth_store() -> InMemoryAuthStore:
     return InMemoryAuthStore()
+
+
+@lru_cache(maxsize=1)
+def get_auth_attempt_tracker() -> AuthAttemptTracker:
+    return AuthAttemptTracker()
 
 
 @lru_cache(maxsize=1)
@@ -111,6 +292,7 @@ def get_auth_settings() -> Settings:
 
 def reset_auth_store_for_tests() -> None:
     get_auth_store.cache_clear()
+    get_auth_attempt_tracker.cache_clear()
     get_auth_settings.cache_clear()
 
 
@@ -142,7 +324,12 @@ def _issue_tokens(*, settings: Settings, user: UserRecord) -> TokenResponse:
         role=user.role.value,
         algorithm=settings.jwt_algorithm,
     )
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    csrf_token = generate_csrf_token()
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        csrf_token=csrf_token,
+    )
 
 
 def _decode_refresh_or_raise(*, settings: Settings, token: str) -> TokenPayload:
@@ -161,10 +348,124 @@ def _decode_refresh_or_raise(*, settings: Settings, token: str) -> TokenPayload:
         ) from exc
 
 
+def _set_auth_cookies(*, settings: Settings, response: Response, tokens: TokenResponse) -> None:
+    if not settings.auth_cookie_enabled:
+        return
+
+    cookie_domain = settings.cookie_domain or None
+    refresh_cookie_max_age = settings.jwt_refresh_token_expire_days * 24 * 60 * 60
+
+    response.set_cookie(
+        key=settings.auth_refresh_cookie_name,
+        value=tokens.refresh_token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        max_age=refresh_cookie_max_age,
+        path=settings.auth_refresh_cookie_path,
+        domain=cookie_domain,
+    )
+
+    response.set_cookie(
+        key=settings.auth_csrf_cookie_name,
+        value=tokens.csrf_token or "",
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        max_age=refresh_cookie_max_age,
+        path=settings.auth_csrf_cookie_path,
+        domain=cookie_domain,
+    )
+
+
+def _clear_auth_cookies(*, settings: Settings, response: Response) -> None:
+    if not settings.auth_cookie_enabled:
+        return
+
+    cookie_domain = settings.cookie_domain or None
+    response.delete_cookie(
+        key=settings.auth_refresh_cookie_name,
+        path=settings.auth_refresh_cookie_path,
+        domain=cookie_domain,
+    )
+    response.delete_cookie(
+        key=settings.auth_csrf_cookie_name,
+        path=settings.auth_csrf_cookie_path,
+        domain=cookie_domain,
+    )
+
+
+def _resolve_refresh_token(
+    *,
+    settings: Settings,
+    request: Request,
+    payload_token: str | None,
+) -> str:
+    if payload_token and settings.auth_allow_refresh_token_body_fallback:
+        return payload_token
+
+    if payload_token and not settings.auth_allow_refresh_token_body_fallback:
+        raise AppError(
+            message="Refresh token body fallback is disabled",
+            status_code=401,
+            code=AUTH_COOKIE_ERROR_CODE,
+        )
+
+    if settings.auth_cookie_enabled:
+        cookie_refresh_token = request.cookies.get(settings.auth_refresh_cookie_name)
+        if cookie_refresh_token:
+            return cookie_refresh_token
+
+    raise AppError(
+        message="Refresh token is missing",
+        status_code=401,
+        code="invalid_refresh_token",
+    )
+
+
+def _client_ip_from_request(request: Request) -> str:
+    if request.client is None:
+        return "unknown"
+    return request.client.host or "unknown"
+
+
+def _rate_limited_error(*, scope: str, retry_after_seconds: int) -> AppError:
+    return AppError(
+        message=f"Too many {scope} attempts. Retry after {retry_after_seconds} seconds.",
+        status_code=429,
+        code=AUTH_RATE_LIMIT_ERROR_CODE,
+        details={
+            "scope": scope,
+            "retry_after_seconds": retry_after_seconds,
+        },
+    )
+
+
 @router.post("/register-tenant", status_code=status.HTTP_201_CREATED)
-async def register_tenant(payload: RegisterTenantRequest) -> RegisterTenantResponse:
+async def register_tenant(
+    payload: RegisterTenantRequest,
+    request: Request,
+) -> RegisterTenantResponse:
     settings = get_auth_settings()
     _ensure_jwt_keys(settings)
+
+    tracker = get_auth_attempt_tracker()
+    client_ip = _client_ip_from_request(request)
+
+    retry_after_seconds = tracker.register_retry_after_seconds(
+        email=payload.admin_email,
+        client_ip=client_ip,
+    )
+    if retry_after_seconds is not None:
+        raise _rate_limited_error(scope="register", retry_after_seconds=retry_after_seconds)
+
+    retry_after_seconds = tracker.record_register_attempt(
+        settings=settings,
+        email=payload.admin_email,
+        client_ip=client_ip,
+    )
+    if retry_after_seconds is not None:
+        raise _rate_limited_error(scope="register", retry_after_seconds=retry_after_seconds)
 
     store = get_auth_store()
     user = store.register_tenant_admin(
@@ -182,27 +483,67 @@ async def register_tenant(payload: RegisterTenantRequest) -> RegisterTenantRespo
 
 
 @router.post("/login")
-async def login(payload: LoginRequest) -> TokenResponse:
+async def login(payload: LoginRequest, request: Request, response: Response) -> TokenResponse:
     settings = get_auth_settings()
     _ensure_jwt_keys(settings)
 
-    store = get_auth_store()
-    user = store.authenticate(
+    tracker = get_auth_attempt_tracker()
+    client_ip = _client_ip_from_request(request)
+    retry_after_seconds = tracker.login_retry_after_seconds(
         tenant_id=payload.tenant_id,
         email=payload.email,
-        password=payload.password,
+        client_ip=client_ip,
+    )
+    if retry_after_seconds is not None:
+        raise _rate_limited_error(scope="login", retry_after_seconds=retry_after_seconds)
+
+    store = get_auth_store()
+    try:
+        user = store.authenticate(
+            tenant_id=payload.tenant_id,
+            email=payload.email,
+            password=payload.password,
+        )
+    except AppError as exc:
+        if exc.code != "invalid_credentials":
+            raise
+
+        retry_after_seconds = tracker.record_login_failure(
+            settings=settings,
+            tenant_id=payload.tenant_id,
+            email=payload.email,
+            client_ip=client_ip,
+        )
+        if retry_after_seconds is not None:
+            raise _rate_limited_error(
+                scope="login",
+                retry_after_seconds=retry_after_seconds,
+            ) from exc
+        raise
+
+    tracker.reset_login_failures(
+        tenant_id=payload.tenant_id,
+        email=payload.email,
+        client_ip=client_ip,
     )
 
-    return _issue_tokens(settings=settings, user=user)
+    tokens = _issue_tokens(settings=settings, user=user)
+    _set_auth_cookies(settings=settings, response=response, tokens=tokens)
+    return tokens
 
 
 @router.post("/refresh")
-async def refresh(payload: RefreshRequest) -> TokenResponse:
+async def refresh(payload: RefreshRequest, request: Request, response: Response) -> TokenResponse:
     settings = get_auth_settings()
     _ensure_jwt_keys(settings)
 
     store = get_auth_store()
-    token_payload = _decode_refresh_or_raise(settings=settings, token=payload.refresh_token)
+    refresh_token = _resolve_refresh_token(
+        settings=settings,
+        request=request,
+        payload_token=payload.refresh_token,
+    )
+    token_payload = _decode_refresh_or_raise(settings=settings, token=refresh_token)
 
     if store.is_refresh_revoked(token_payload.jti):
         raise AppError(
@@ -221,16 +562,24 @@ async def refresh(payload: RefreshRequest) -> TokenResponse:
         )
 
     store.revoke_refresh_jti(token_payload.jti)
-    return _issue_tokens(settings=settings, user=user)
+    tokens = _issue_tokens(settings=settings, user=user)
+    _set_auth_cookies(settings=settings, response=response, tokens=tokens)
+    return tokens
 
 
 @router.post("/logout")
-async def logout(payload: LogoutRequest) -> dict[str, str]:
+async def logout(payload: LogoutRequest, request: Request, response: Response) -> dict[str, str]:
     settings = get_auth_settings()
     _ensure_jwt_keys(settings)
 
     store = get_auth_store()
-    token_payload = _decode_refresh_or_raise(settings=settings, token=payload.refresh_token)
+    refresh_token = _resolve_refresh_token(
+        settings=settings,
+        request=request,
+        payload_token=payload.refresh_token,
+    )
+    token_payload = _decode_refresh_or_raise(settings=settings, token=refresh_token)
     store.revoke_refresh_jti(token_payload.jti)
+    _clear_auth_cookies(settings=settings, response=response)
 
     return {"status": "logged_out"}

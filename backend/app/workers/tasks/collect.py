@@ -39,7 +39,9 @@ def _build_redis_client() -> Redis:
 
 
 def _retry_delay_seconds(retry_count: int) -> int:
-    return min(300, 10 * (2**retry_count))
+    bounded_retry = retry_count if retry_count >= 0 else 0
+    delay = 10 * (2**bounded_retry)
+    return 300 if delay > 300 else delay
 
 
 @celery_app.task(name="app.workers.tasks.collect.poll_active_mailboxes")
@@ -213,7 +215,7 @@ def _extract_attachments(raw_message: bytes) -> list[AttachmentPayload]:
 
     for part in message.iter_attachments():
         payload = part.get_payload(decode=True)
-        if payload is None:
+        if not isinstance(payload, bytes):
             continue
 
         filename = part.get_filename() or "attachment.bin"
@@ -234,10 +236,7 @@ def _build_object_name(
     message_uid: str,
     filename: str,
 ) -> str:
-    return (
-        f"tenants/{tenant_id}/mailboxes/{mailbox_id}/messages/"
-        f"{message_uid}/{filename}"
-    )
+    return f"tenants/{tenant_id}/mailboxes/{mailbox_id}/messages/{message_uid}/{filename}"
 
 
 def _guess_content_type(filename: str) -> str:

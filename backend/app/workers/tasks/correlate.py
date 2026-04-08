@@ -6,7 +6,7 @@ from celery import Task
 from app.repositories.record_repository import RecordRepository
 from app.services.correlation.classifier import CorrelationClassifier
 from app.services.correlation.detector import CorrelationDetector
-from app.services.correlation.incident_creator import IncidentCreator
+from app.services.correlation.incident_creator import CreatedIncident, IncidentCreator
 from app.workers.celery_app import celery_app
 
 
@@ -27,7 +27,9 @@ def _build_incident_creator() -> IncidentCreator:
 
 
 def _retry_delay_seconds(retry_count: int) -> int:
-    return min(300, 10 * (2**retry_count))
+    bounded_retry = retry_count if retry_count >= 0 else 0
+    delay = 10 * (2**bounded_retry)
+    return 300 if delay > 300 else delay
 
 
 @celery_app.task(bind=True, name="app.workers.tasks.correlate.detect_correlations", max_retries=5)
@@ -69,16 +71,36 @@ async def _detect_correlations_async(
         total_records=total_records,
     )
     classifications = classifier.classify(signals)
-    incidents_created = await incident_creator.create_incidents(
-        tenant_id=tenant_id,
-        classifications=classifications,
-    )
+    created_incidents: list[CreatedIncident]
+    if isinstance(incident_creator, IncidentCreator):
+        created_incidents = await incident_creator.create_incidents_with_details(
+            tenant_id=tenant_id,
+            classifications=classifications,
+        )
+        incidents_created = len(created_incidents)
+    else:
+        created_incidents = []
+        incidents_created = await incident_creator.create_incidents(
+            tenant_id=tenant_id,
+            classifications=classifications,
+        )
+
+    for item in created_incidents:
+        celery_app.send_task(
+            "app.workers.tasks.alert.dispatch_existing_alert",
+            kwargs={
+                "tenant_id": tenant_id,
+                "alert_id": item.id,
+                "source": "correlation",
+            },
+        )
 
     return {
         "tenant_id": tenant_id,
         "report_db_id": report_db_id,
         "signals_detected": len(signals),
         "incidents_created": incidents_created,
+        "alerts_enqueued": len(created_incidents),
     }
 
 

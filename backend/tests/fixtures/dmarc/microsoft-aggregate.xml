@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feedback>
+  <report_metadata>
+    <org_name>Microsoft Outlook</org_name>
+    <email>dmarcreport@outlook.com</email>
+    <report_id>msft-2026-04-06-example.com</report_id>
+    <date_range>
+      <begin>1775433600</begin>
+      <end>1775520000</end>
+    </date_range>
+  </report_metadata>
+  <policy_published>
+    <domain>example.com</domain>
+  </policy_published>
+  <record>
+    <row>
+      <source_ip>198.51.100.25</source_ip>
+      <count>3</count>
+      <policy_evaluated>
+        <disposition>none</disposition>
+        <dkim>fail</dkim>
+        <spf>pass</spf>
+      </policy_evaluated>
+    </row>
+    <identifiers>
+      <header_from>example.com</header_from>
+      <envelope_from>mail.protection.outlook.com</envelope_from>
+    </identifiers>
+  </record>
+</feedback>

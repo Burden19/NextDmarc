@@ -13,6 +13,15 @@ npm install
 npm run dev
 ```
 
+## Environment
+- `NEXT_PUBLIC_API_BASE_URL` (optional): backend API base URL.
+- Default value in code: `http://localhost:8000/api/v1`.
+
+Example `.env.local`:
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+```
+
 ## Available scripts
 - `npm run dev` - start local dev server
 - `npm run build` - production build
@@ -22,10 +31,11 @@ npm run dev
 ## Structure
 - `src/pages` - route pages (dashboard, domains, reports, alerts, scoring, governance, integrations)
 - `src/components` - layout and reusable UI cards
-- `src/data/mock.js` - placeholder data (replace with API wiring)
+- `src/lib/apiClient.js` - shared API request helper with auth headers and refresh retry
+- `src/lib/authSession.js` - auth session persistence and login/register helpers
 - `src/theme.js` - MUI theme with blue brand palette
 
 ## Notes
 - The sidebar and top bar reflect the SOC-friendly navigation.
-- Replace `mock.js` with real API calls as the backend is implemented.
+- Login and data pages are wired to backend APIs and tenant-scoped headers.
 

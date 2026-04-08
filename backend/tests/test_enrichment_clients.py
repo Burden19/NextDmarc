@@ -60,11 +60,7 @@ async def test_enrichment_service_aggregates_provider_outputs() -> None:
         return httpx.Response(
             status_code=200,
             json={
-                "data": {
-                    "attributes": {
-                        "last_analysis_stats": {"malicious": 3, "suspicious": 1}
-                    }
-                }
+                "data": {"attributes": {"last_analysis_stats": {"malicious": 3, "suspicious": 1}}}
             },
         )
 

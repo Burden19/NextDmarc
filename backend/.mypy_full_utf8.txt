@@ -1,0 +1,159 @@
+app\services\mailbox_store.py:54: error: Function "app.services.mailbox_store.InMemoryMailboxStore.list" is not valid as a type  [valid-type]
+app\services\mailbox_store.py:54: note: Perhaps you need "Callable[...]" or a callback protocol?
+app\services\parser\dmarc_parser.py:7: error: Library stubs not installed for "defusedxml"  [import-untyped]
+app\services\parser\dmarc_parser.py:8: error: Library stubs not installed for "defusedxml.common"  [import-untyped]
+app\services\parser\dmarc_parser.py:8: note: Hint: "python3 -m pip install types-defusedxml"
+app\services\parser\dmarc_parser.py:8: note: (or run "mypy --install-types" to install all missing stub packages)
+app\services\parser\dmarc_parser.py:199: error: Incompatible return value type (got "str", expected "Literal['pass', 'fail']")  [return-value]
+app\services\enrichment\clients.py:231: error: Returning Any from function declared to return "int | None"  [no-any-return]
+app\services\enrichment\clients.py:231: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\enrichment\clients.py:231: note: Possible overload variants:
+app\services\enrichment\clients.py:231: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\enrichment\clients.py:231: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\workers\celery_app.py:1: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\celery_app.py:2: error: Skipping analyzing "celery.schedules": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\celery_app.py:3: error: Skipping analyzing "kombu": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\services\collector\imap_client.py:73: error: Skipping analyzing "aioimaplib": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\services\collector\imap_client.py:73: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+app\services\collector\imap_client.py:76: error: Returning Any from function declared to return "ImapConnection"  [no-any-return]
+app\services\collector\imap_client.py:82: error: Returning Any from function declared to return "ImapConnection"  [no-any-return]
+app\workers\tasks\score.py:4: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\score.py:20: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\score.py:23: error: Untyped decorator makes function "compute_score" untyped  [untyped-decorator]
+app\workers\tasks\recommend.py:4: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\recommend.py:20: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\recommend.py:23: error: Untyped decorator makes function "generate_recommendations" untyped  [untyped-decorator]
+app\workers\tasks\collect.py:7: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\collect.py:42: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\collect.py:45: error: Untyped decorator makes function "poll_active_mailboxes" untyped  [untyped-decorator]
+app\workers\tasks\collect.py:51: error: "list?[app.services.mailbox_store.MailboxRecord]" has no attribute "__iter__" (not iterable)  [attr-defined]
+app\workers\tasks\collect.py:64: error: Untyped decorator makes function "collect_mailbox_reports" untyped  [untyped-decorator]
+app\workers\tasks\collect.py:220: error: Argument "content" to "AttachmentPayload" has incompatible type "Message[str, str] | bytes | Any"; expected "bytes"  [arg-type]
+app\services\parser\report_persister.py:49: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+app\services\parser\report_persister.py:70: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+app\repositories\incident_repository.py:79: error: No overload variant of "dict" matches argument type "object"  [call-overload]
+app\repositories\incident_repository.py:79: note: Possible overload variants:
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self) -> dict[_KT, _VT]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, SupportsKeysAndGetItem[_KT, _VT], /) -> dict[_KT, _VT]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, Iterable[tuple[_KT, _VT]], /) -> dict[_KT, _VT]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, Iterable[list[str]], /) -> dict[str, str]
+app\repositories\incident_repository.py:79: note:     def [_KT, _VT] dict(self, Iterable[list[bytes]], /) -> dict[bytes, bytes]
+app\repositories\incident_repository.py:81: error: Value of type "object" is not indexable  [index]
+app\repositories\incident_repository.py:82: error: Value of type "object" is not indexable  [index]
+app\repositories\incident_repository.py:83: error: Value of type "object" is not indexable  [index]
+app\repositories\incident_repository.py:84: error: Value of type "object" is not indexable  [index]
+app\repositories\incident_repository.py:85: error: Value of type "object" is not indexable  [index]
+app\repositories\incident_repository.py:86: error: Value of type "object" is not indexable  [index]
+app\repositories\incident_repository.py:87: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:196: error: Function "app.repositories.alert_repository.AlertRepository.list" is not valid as a type  [valid-type]
+app\repositories\alert_repository.py:196: note: Perhaps you need "Callable[...]" or a callback protocol?
+app\repositories\alert_repository.py:445: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+app\repositories\alert_repository.py:507: error: No overload variant of "dict" matches argument type "object"  [call-overload]
+app\repositories\alert_repository.py:507: note: Possible overload variants:
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self) -> dict[_KT, _VT]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, SupportsKeysAndGetItem[_KT, _VT], /) -> dict[_KT, _VT]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, Iterable[tuple[_KT, _VT]], /) -> dict[_KT, _VT]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, Iterable[list[str]], /) -> dict[str, str]
+app\repositories\alert_repository.py:507: note:     def [_KT, _VT] dict(self, Iterable[list[bytes]], /) -> dict[bytes, bytes]
+app\repositories\alert_repository.py:509: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:510: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:511: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:512: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:513: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:514: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:515: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:516: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:517: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:518: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:524: error: No overload variant of "dict" matches argument type "object"  [call-overload]
+app\repositories\alert_repository.py:524: note: Possible overload variants:
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self) -> dict[_KT, _VT]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, SupportsKeysAndGetItem[_KT, _VT], /) -> dict[_KT, _VT]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, Iterable[tuple[_KT, _VT]], /) -> dict[_KT, _VT]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> dict[str, _VT]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, Iterable[list[str]], /) -> dict[str, str]
+app\repositories\alert_repository.py:524: note:     def [_KT, _VT] dict(self, Iterable[list[bytes]], /) -> dict[bytes, bytes]
+app\repositories\alert_repository.py:526: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:527: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:528: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:529: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:530: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:531: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:532: error: Value of type "object" is not indexable  [index]
+app\repositories\alert_repository.py:533: error: Value of type "object" is not indexable  [index]
+app\workers\tasks\alert.py:4: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\alert.py:66: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\alert.py:69: error: Untyped decorator makes function "create_and_dispatch_alert" untyped  [untyped-decorator]
+app\workers\tasks\alert.py:81: error: Untyped decorator makes function "dispatch_existing_alert" untyped  [untyped-decorator]
+app\workers\tasks\alert.py:276: error: Returning Any from function declared to return "DispatchResult"  [no-any-return]
+app\core\middleware.py:57: error: Argument 1 to "int" has incompatible type "Awaitable[Any] | Any"; expected "str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc"  [arg-type]
+app\api\v1\recommendations.py:21: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+app\api\v1\recommendations.py:33: error: List comprehension has incompatible type List[dict[str, str]]; expected List[RecommendationItemResponse]  [misc]
+app\api\v1\alerts.py:252: error: "list?[app.repositories.alert_repository.AlertAuditEntity]" has no attribute "__iter__" (not iterable)  [attr-defined]
+app\workers\tasks\parse.py:3: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\parse.py:29: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\parse.py:32: error: Untyped decorator makes function "parse_report_object" untyped  [untyped-decorator]
+app\workers\tasks\correlate.py:4: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\correlate.py:30: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\correlate.py:33: error: Untyped decorator makes function "detect_correlations" untyped  [untyped-decorator]
+app\workers\tasks\analysis.py:3: error: Skipping analyzing "celery": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\workers\tasks\analysis.py:19: error: Returning Any from function declared to return "int"  [no-any-return]
+app\workers\tasks\analysis.py:22: error: Untyped decorator makes function "analyze_report_conformance" untyped  [untyped-decorator]
+app\services\sources\intelligence.py:20: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\sources\intelligence.py:20: note: Possible overload variants:
+app\services\sources\intelligence.py:20: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\sources\intelligence.py:20: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\sources\intelligence.py:33: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\sources\intelligence.py:33: note: Possible overload variants:
+app\services\sources\intelligence.py:33: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\sources\intelligence.py:33: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\sources\intelligence.py:34: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\sources\intelligence.py:34: note: Possible overload variants:
+app\services\sources\intelligence.py:34: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\sources\intelligence.py:34: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\sources\intelligence.py:38: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\sources\intelligence.py:38: note: Possible overload variants:
+app\services\sources\intelligence.py:38: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\sources\intelligence.py:38: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\sources\intelligence.py:59: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\sources\intelligence.py:59: note: Possible overload variants:
+app\services\sources\intelligence.py:59: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\sources\intelligence.py:59: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\sources\intelligence.py:83: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\sources\intelligence.py:83: note: Possible overload variants:
+app\services\sources\intelligence.py:83: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\sources\intelligence.py:83: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\analytics\metrics.py:26: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\analytics\metrics.py:26: note: Possible overload variants:
+app\services\analytics\metrics.py:26: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\analytics\metrics.py:26: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\analytics\metrics.py:66: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\analytics\metrics.py:66: note: Possible overload variants:
+app\services\analytics\metrics.py:66: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\analytics\metrics.py:66: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\analytics\metrics.py:86: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\analytics\metrics.py:86: note: Possible overload variants:
+app\services\analytics\metrics.py:86: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\analytics\metrics.py:86: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\analytics\metrics.py:117: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\services\analytics\metrics.py:117: note: Possible overload variants:
+app\services\analytics\metrics.py:117: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\services\analytics\metrics.py:117: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+app\services\analytics\metrics.py:130: error: Incompatible return value type (got "dict[str, int]", expected "dict[str, object]")  [return-value]
+app\services\analytics\metrics.py:130: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+app\services\analytics\metrics.py:130: note: Consider using "Mapping" instead, which is covariant in the value type
+app\services\analytics\metrics.py:130: note: Perhaps you need a type annotation for "buckets"? Suggestion: "dict[str, object]"
+app\api\v1\reports.py:14: error: Function is missing a type annotation for one or more arguments  [no-untyped-def]
+app\api\v1\ioc.py:50: error: No overload variant of "int" matches argument type "object"  [call-overload]
+app\api\v1\ioc.py:50: note: Possible overload variants:
+app\api\v1\ioc.py:50: note:     def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+app\api\v1\ioc.py:50: note:     def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+Found 87 errors in 22 files (checked 103 source files)

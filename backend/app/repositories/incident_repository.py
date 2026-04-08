@@ -1,5 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, cast
 
 from sqlalchemy import text
 
@@ -33,7 +35,7 @@ class IncidentRepository:
                 ),
                 {"tenant_id": tenant_id, "limit": limit},
             )
-            return [_map_incident(row) for row in rows.mappings().all()]
+            return [_map_incident(cast(Mapping[str, Any], row)) for row in rows.mappings().all()]
 
     async def get_by_id(self, *, tenant_id: str, incident_id: str) -> IncidentEntity | None:
         session_factory = get_session_factory()
@@ -51,7 +53,7 @@ class IncidentRepository:
             mapped = row.mappings().first()
             if mapped is None:
                 return None
-            return _map_incident(mapped)
+            return _map_incident(cast(Mapping[str, Any], mapped))
 
     async def close(self, *, tenant_id: str, incident_id: str) -> IncidentEntity | None:
         session_factory = get_session_factory()
@@ -71,12 +73,10 @@ class IncidentRepository:
             if mapped is None:
                 return None
             await session.commit()
-            return _map_incident(mapped)
+            return _map_incident(cast(Mapping[str, Any], mapped))
 
 
-def _map_incident(row: object) -> IncidentEntity:
-    if not isinstance(row, dict):
-        row = dict(row)
+def _map_incident(row: Mapping[str, Any]) -> IncidentEntity:
     return IncidentEntity(
         id=str(row["id"]),
         tenant_id=str(row["tenant_id"]),

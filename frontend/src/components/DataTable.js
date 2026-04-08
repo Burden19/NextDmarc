@@ -48,7 +48,11 @@ export default function DataTable({ columns, rows }) {
               }}
             >
               {columns.map((column) => (
-                <TableCell key={column.key}>{renderCell(row[column.key], column.key)}</TableCell>
+                <TableCell key={column.key}>
+                  {typeof column.render === "function"
+                    ? column.render(row)
+                    : renderCell(row[column.key], column.key)}
+                </TableCell>
               ))}
             </TableRow>
           ))}

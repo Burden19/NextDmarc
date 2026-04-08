@@ -17,7 +17,7 @@ class SourceIntelligenceService:
             source_ip = str(nested.get("source_ip", "")).strip()
             if not source_ip:
                 continue
-            count = int(nested.get("count", 1))
+            count = _as_int(nested.get("count"), default=1)
 
             current = grouped.get(source_ip)
             if current is None:
@@ -30,12 +30,12 @@ class SourceIntelligenceService:
                 }
                 grouped[source_ip] = current
 
-            current["message_count"] = int(current["message_count"]) + count
-            current["reports_count"] = int(current["reports_count"]) + 1
+            current["message_count"] = _as_int(current.get("message_count"), default=0) + count
+            current["reports_count"] = _as_int(current.get("reports_count"), default=0) + 1
 
         return sorted(
             grouped.values(),
-            key=lambda item: int(item["message_count"]),
+            key=lambda item: _as_int(item.get("message_count"), default=0),
             reverse=True,
         )
 
@@ -56,7 +56,7 @@ class SourceIntelligenceService:
 
         for item in records:
             nested = _record(item)
-            message_count += int(nested.get("count", 1))
+            message_count += _as_int(nested.get("count"), default=1)
             header_from = str(nested.get("header_from", "")).strip().lower()
             if header_from:
                 unique_domains.add(header_from)
@@ -80,7 +80,7 @@ class SourceIntelligenceService:
         for item in records:
             nested = _record(item)
             domain = str(nested.get("header_from", "unknown")).strip().lower() or "unknown"
-            by_domain[domain] += int(nested.get("count", 1))
+            by_domain[domain] += _as_int(nested.get("count"), default=1)
 
         return [
             {
@@ -125,3 +125,21 @@ def _record(item: dict[str, object]) -> dict[str, object]:
 
 def _iso_utc_now() -> str:
     return datetime.now(tz=UTC).isoformat()
+
+
+def _as_int(value: object, *, default: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return default
+        try:
+            return int(candidate)
+        except ValueError:
+            return default
+    return default

@@ -63,29 +63,29 @@ Build the backend from scratch in phased increments, with each task tracked as a
 [x] Phase exit criteria: analytics and source intelligence endpoints return real computed data.
 
 5. Phase 4 - Alerting, Integrations, Realtime, Hardening (depends on Step 4)
-[ ] Implement alert router with severity-to-channel mapping.
-[ ] Implement notifiers: email, Slack webhook, SIEM push.
-[ ] Implement alerts worker for lifecycle creation and channel dispatch.
-[ ] Implement alerts API triage actions (status updates, assign, comment, escalate) with audit trail.
-[ ] Implement WebSocket alerts endpoint using Redis Pub/Sub for tenant-scoped realtime events.
-[ ] Implement integrations API CRUD and connector test endpoint.
-[ ] Implement recommendations API list/detail/resolve.
-[ ] Implement IOC feed endpoints (JSON + CSV; optional STIX deferred unless confirmed in Phase 0).
-[ ] Implement structured logging (structlog JSON), metrics exposure, and OpenTelemetry instrumentation.
-[ ] Finalize rate limiting and audit logging across write operations.
-[ ] Complete Kubernetes manifests and overlays for staging rollout.
-[ ] Phase exit criteria: alert lifecycle, realtime push, and staging deployment are validated.
+[x] Implement alert router with severity-to-channel mapping.
+[x] Implement notifiers: email, Slack webhook, SIEM push.
+[x] Implement alerts worker for lifecycle creation and channel dispatch.
+[x] Implement alerts API triage actions (status updates, assign, comment, escalate) with audit trail.
+[x] Implement WebSocket alerts endpoint using Redis Pub/Sub for tenant-scoped realtime events.
+[x] Implement integrations API CRUD and connector test endpoint.
+[x] Implement recommendations API list/detail/resolve.
+[x] Implement IOC feed endpoints (JSON + CSV; optional STIX deferred unless confirmed in Phase 0).
+[x] Implement structured logging (structlog JSON), metrics exposure, and OpenTelemetry instrumentation.
+[x] Finalize rate limiting and audit logging across write operations.
+[x] Complete Kubernetes manifests and overlays for staging rollout.
+[x] Phase exit criteria: alert lifecycle, realtime push, and staging deployment are validated.
 
 6. Phase 5 - Verification and Release Readiness (depends on Steps 2-5)
-[ ] Unit tests for parser, alignment, scoring, recommendations, correlation.
-[ ] Integration tests for auth, reports, pipeline, alerts.
-[ ] E2E test with representative DMARC XML fixtures (Google + Microsoft formats).
-[ ] Validate tenant isolation via explicit RLS tests (cross-tenant access must fail).
-[ ] Validate retry/idempotency behavior for collector/parser workers.
-[ ] Run lint/type/security/coverage gates and document outputs.
-[ ] Execute performance smoke test target and capture baseline metrics.
-[ ] Finalize backend README runbook and API usage notes.
-[ ] Release readiness checklist signed off.
+[x] Unit tests for parser, alignment, scoring, recommendations, correlation.
+[x] Integration tests for auth, reports, pipeline, alerts.
+[x] E2E test with representative DMARC XML fixtures (Google + Microsoft formats).
+[x] Validate tenant isolation via explicit RLS tests (cross-tenant access must fail).
+[x] Validate retry/idempotency behavior for collector/parser workers.
+[x] Run lint/type/security/coverage gates and document outputs.
+[x] Execute performance smoke test target and capture baseline metrics.
+[x] Finalize backend README runbook and API usage notes.
+[x] Release readiness checklist signed off.
 
 7. Phase 6 - ML Anomaly Detection (post-MVP, depends on Step 6)
 [ ] Define anomaly detection use-cases and labels (source-level, domain-level, time-window level).
