@@ -1,5 +1,36 @@
 # NextDmarc Backend
 
+Backend service for NextDmarc built with FastAPI, Celery, PostgreSQL, Redis, Elasticsearch, and MinIO.
+This backend is actively wired with the frontend and provides tenant-scoped APIs, worker pipelines, alerting workflows, and operational artifacts.
+
+## Current Status
+
+- Phases 0 to 5 are marked complete in `plan-nextdmarc-backend.prompt.md`.
+- Frontend data-bearing pages are wired to live APIs (mock data retired).
+- Alerts triage + realtime stream, recommendations resolve/reopen, and integrations CRUD/test flows are implemented.
+- Latest handoff checkpoint: `artifacts/session-checkpoint-2026-04-08.md`.
+
+## Quick Start (Local)
+
+From `backend/`:
+
+```bash
+pip install -e ".[dev]"
+docker compose up -d postgres redis elasticsearch minio
+alembic upgrade head
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Optional worker start (separate terminal):
+
+```bash
+celery -A app.workers.celery_app.celery_app worker -l info
+```
+
+API docs:
+- OpenAPI: `http://localhost:8000/docs`
+- Metrics: `http://localhost:8000/metrics`
+
 ## Decision Log
 
 ### Phase 0 Decisions
@@ -119,7 +150,9 @@ HTTP endpoints:
 - `GET /api/v1/alerts/{alert_id}/audit`
 
 WebSocket endpoint:
-- `GET /api/v1/alerts/ws` with `X-Tenant-ID` header (UUID)
+- `GET /api/v1/alerts/ws` with tenant provided by either:
+	- `X-Tenant-ID` header (UUID)
+	- `tenant_id` query parameter (browser-compatible fallback)
 - Uses Redis Pub/Sub channel format `alerts:tenant:{tenant_id}`
 
 ### Integrations API
@@ -142,6 +175,7 @@ Recommendations:
 - `GET /api/v1/recommendations`
 - `GET /api/v1/recommendations/{report_db_id}`
 - `POST /api/v1/recommendations/{report_db_id}/resolve`
+- `POST /api/v1/recommendations/{report_db_id}/reopen`
 
 IOC feeds:
 - `GET /api/v1/ioc/json`

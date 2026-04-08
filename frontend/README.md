@@ -1,41 +1,84 @@
 # NextDmarc Frontend
 
-Next.js (React) frontend for the NextDmarc DMARC analysis platform. The UI is aligned with the four-actor governance model and mirrors the conception artifacts in `complete_conception/four_actors`.
+Next.js frontend for the NextDmarc DMARC platform.
+The UI is fully wired to backend APIs and no longer depends on `src/data/mock.js`.
 
 ## Stack
-- Next.js (Pages Router)
-- JavaScript
+
+- Next.js 14 (Pages Router)
+- React 18 (JavaScript)
 - Material UI + Tailwind CSS
 
-## Quick start
+## Quick Start
+
+From `frontend/`:
+
 ```bash
 npm install
 npm run dev
 ```
 
+App URL: `http://localhost:3000`
+
 ## Environment
+
 - `NEXT_PUBLIC_API_BASE_URL` (optional): backend API base URL.
-- Default value in code: `http://localhost:8000/api/v1`.
+- Default value: `http://localhost:8000/api/v1`.
 
 Example `.env.local`:
+
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
 ```
 
-## Available scripts
+## Available Scripts
+
 - `npm run dev` - start local dev server
 - `npm run build` - production build
-- `npm run start` - run the production build
+- `npm run start` - run production build
 - `npm run lint` - eslint checks
 
-## Structure
-- `src/pages` - route pages (dashboard, domains, reports, alerts, scoring, governance, integrations)
-- `src/components` - layout and reusable UI cards
-- `src/lib/apiClient.js` - shared API request helper with auth headers and refresh retry
-- `src/lib/authSession.js` - auth session persistence and login/register helpers
-- `src/theme.js` - MUI theme with blue brand palette
+## Current Frontend Integration Scope
+
+Auth/session foundation:
+- `src/lib/authSession.js` handles register/login/refresh/logout and session persistence.
+- `src/lib/apiClient.js` injects auth headers, forwards CSRF header on writes, and retries once after refresh on 401.
+
+Pages wired to backend data:
+- `src/pages/index.js`
+- `src/pages/dashboard.js`
+- `src/pages/domains.js`
+- `src/pages/reports.js`
+- `src/pages/alerts.js`
+- `src/pages/recommendations.js`
+- `src/pages/integrations.js`
+- `src/pages/scoring.js`
+
+Implemented workflows:
+- Alerts triage actions and realtime updates via WebSocket.
+- Recommendations resolve and reopen actions.
+- Integrations create, test, enable/disable, and delete actions.
+
+## Role Model
+
+Roles are defined in `src/access/roles.js`:
+
+- `nextstep_admin`
+- `client_admin`
+- `analyst_soc`
+- `client_user`
+
+## Validation
+
+Run from `frontend/`:
+
+```bash
+npm run lint
+npm run build
+```
 
 ## Notes
-- The sidebar and top bar reflect the SOC-friendly navigation.
-- Login and data pages are wired to backend APIs and tenant-scoped headers.
+
+- Frontend requests are tenant-scoped and role-aware.
+- For browser WebSocket compatibility, backend supports tenant id in query parameter fallback.
 
