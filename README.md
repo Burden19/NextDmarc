@@ -76,7 +76,7 @@ NextDmarc/
 From `backend/`:
 
 ```bash
-pip install -e ".[dev]"
+pip install -e .
 docker compose up -d postgres redis elasticsearch minio
 alembic upgrade head
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

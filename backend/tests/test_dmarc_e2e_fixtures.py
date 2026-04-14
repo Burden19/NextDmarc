@@ -138,6 +138,7 @@ def _run_fixture_pipeline(*, monkeypatch: MonkeyPatch, fixture_name: str) -> dic
     )
     monkeypatch.setattr(parse_module, "_build_report_persister", lambda: FakePersister())
     monkeypatch.setattr(parse_module, "_build_report_indexer", lambda: FakeIndexer())
+    monkeypatch.setattr(parse_module.celery_app, "send_task", lambda *args, **kwargs: None)
 
     return asyncio.run(
         parse_module._parse_report_object_async(

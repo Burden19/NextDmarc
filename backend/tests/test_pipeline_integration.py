@@ -147,6 +147,7 @@ def test_collect_parse_persist_index_integration(monkeypatch: MonkeyPatch) -> No
     )
     monkeypatch.setattr(parse_module, "_build_report_persister", lambda: FakePersister())
     monkeypatch.setattr(parse_module, "_build_report_indexer", lambda: FakeIndexer())
+    monkeypatch.setattr(parse_module.celery_app, "send_task", lambda *args, **kwargs: None)
 
     parse_result = asyncio.run(
         parse_module._parse_report_object_async(tenant_id="tenant-1", object_name=object_name)
@@ -155,3 +156,4 @@ def test_collect_parse_persist_index_integration(monkeypatch: MonkeyPatch) -> No
     assert parse_result["record_count"] == 1
     assert parse_result["indexed_count"] == 1
     assert parse_result["report_id"] == "integration-r1"
+    assert parse_result["analysis_enqueued"] == 1

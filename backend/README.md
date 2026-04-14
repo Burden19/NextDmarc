@@ -15,7 +15,7 @@ This backend is actively wired with the frontend and provides tenant-scoped APIs
 From `backend/`:
 
 ```bash
-pip install -e ".[dev]"
+pip install -e .
 docker compose up -d postgres redis elasticsearch minio
 alembic upgrade head
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -25,6 +25,12 @@ Optional worker start (separate terminal):
 
 ```bash
 celery -A app.workers.celery_app.celery_app worker -l info
+```
+
+On Windows, use a single-process pool to avoid billiard spawn handle errors:
+
+```bash
+celery -A app.workers.celery_app.celery_app worker -l info --pool=solo
 ```
 
 API docs:

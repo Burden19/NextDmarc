@@ -22,11 +22,17 @@ class AttachmentDecompressor:
 
     def decompress(self, *, filename: str, payload: bytes) -> list[AttachmentPayload]:
         lower_name = filename.lower()
-        if lower_name.endswith(".gz"):
+        if lower_name.endswith(".gz") or self._is_gzip_payload(payload):
             return [self._decompress_gzip(filename=filename, payload=payload)]
-        if lower_name.endswith(".zip"):
+        if lower_name.endswith(".zip") or self._is_zip_payload(payload):
             return self._decompress_zip(payload=payload)
         return [AttachmentPayload(filename=filename, content=payload)]
+
+    def _is_gzip_payload(self, payload: bytes) -> bool:
+        return payload.startswith(b"\x1f\x8b")
+
+    def _is_zip_payload(self, payload: bytes) -> bool:
+        return payload.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"))
 
     def _decompress_gzip(self, *, filename: str, payload: bytes) -> AttachmentPayload:
         try:

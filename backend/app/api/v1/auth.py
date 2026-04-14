@@ -1,9 +1,14 @@
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Request, Response, status
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError
@@ -18,6 +23,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.db.session import get_session_factory
 from app.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -45,7 +51,56 @@ class UserRecord:
     role: Role
 
 
-class InMemoryAuthStore:
+class AuthStore(Protocol):
+    async def register_tenant_admin(
+        self,
+        *,
+        tenant_name: str,
+        admin_email: str,
+        admin_password: str,
+    ) -> UserRecord: ...
+
+    async def authenticate(self, *, tenant_id: UUID, email: str, password: str) -> UserRecord: ...
+
+    async def get_user_by_id(self, user_id: UUID) -> UserRecord | None: ...
+
+    async def revoke_refresh_jti(self, jti: str) -> None: ...
+
+    async def is_refresh_revoked(self, jti: str) -> bool: ...
+
+
+def _normalize_email(value: str) -> str:
+    return value.strip().lower()
+
+
+def _tenant_slug(tenant_name: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", tenant_name.strip().lower()).strip("-")
+    if not normalized:
+        normalized = "tenant"
+    return f"{normalized}-{uuid4().hex[:12]}"
+
+
+def _map_user_row(row: Mapping[str, Any]) -> UserRecord:
+    role_value = str(row["role"])
+    try:
+        role = Role(role_value)
+    except ValueError as exc:
+        raise AppError(
+            message="Stored user role is invalid",
+            status_code=500,
+            code="invalid_user_role",
+        ) from exc
+
+    return UserRecord(
+        user_id=UUID(str(row["id"])),
+        tenant_id=UUID(str(row["tenant_id"])),
+        email=str(row["email"]),
+        password_hash=str(row["hashed_password"]),
+        role=role,
+    )
+
+
+class InMemoryAuthStore(AuthStore):
     def __init__(self) -> None:
         self._users_by_scope: dict[tuple[UUID, str], UserRecord] = {}
         self._users_by_id: dict[UUID, UserRecord] = {}
@@ -55,7 +110,7 @@ class InMemoryAuthStore:
     def _scope_key(tenant_id: UUID, email: str) -> tuple[UUID, str]:
         return (tenant_id, email.strip().lower())
 
-    def register_tenant_admin(
+    async def register_tenant_admin(
         self,
         *,
         tenant_name: str,
@@ -83,7 +138,7 @@ class InMemoryAuthStore:
         self._users_by_id[user.user_id] = user
         return user
 
-    def authenticate(self, *, tenant_id: UUID, email: str, password: str) -> UserRecord:
+    async def authenticate(self, *, tenant_id: UUID, email: str, password: str) -> UserRecord:
         scope_key = self._scope_key(tenant_id, email)
         user = self._users_by_scope.get(scope_key)
 
@@ -96,13 +151,160 @@ class InMemoryAuthStore:
 
         return user
 
-    def get_user_by_id(self, user_id: UUID) -> UserRecord | None:
+    async def get_user_by_id(self, user_id: UUID) -> UserRecord | None:
         return self._users_by_id.get(user_id)
 
-    def revoke_refresh_jti(self, jti: str) -> None:
+    async def revoke_refresh_jti(self, jti: str) -> None:
         self._revoked_refresh_jti.add(jti)
 
-    def is_refresh_revoked(self, jti: str) -> bool:
+    async def is_refresh_revoked(self, jti: str) -> bool:
+        return jti in self._revoked_refresh_jti
+
+
+class PostgresAuthStore(AuthStore):
+    def __init__(self) -> None:
+        self._revoked_refresh_jti: set[str] = set()
+
+    async def register_tenant_admin(
+        self,
+        *,
+        tenant_name: str,
+        admin_email: str,
+        admin_password: str,
+    ) -> UserRecord:
+        tenant_id = uuid4()
+        user_id = uuid4()
+        normalized_email = _normalize_email(admin_email)
+        slug = _tenant_slug(tenant_name)
+
+        session_factory = get_session_factory()
+        try:
+            async with session_factory() as session:
+                await session.execute(
+                    text(
+                        """
+                        INSERT INTO tenants (id, name, slug, is_active, created_at, updated_at)
+                        VALUES (:tenant_id, :tenant_name, :slug, true, now(), now())
+                        """
+                    ),
+                    {
+                        "tenant_id": tenant_id,
+                        "tenant_name": tenant_name.strip(),
+                        "slug": slug,
+                    },
+                )
+
+                await session.execute(
+                    text(
+                        """
+                        INSERT INTO users (
+                            id,
+                            tenant_id,
+                            email,
+                            hashed_password,
+                            role,
+                            is_active,
+                            created_at,
+                            updated_at
+                        ) VALUES (
+                            :user_id,
+                            :tenant_id,
+                            :email,
+                            :hashed_password,
+                            :role,
+                            true,
+                            now(),
+                            now()
+                        )
+                        """
+                    ),
+                    {
+                        "user_id": user_id,
+                        "tenant_id": tenant_id,
+                        "email": normalized_email,
+                        "hashed_password": hash_password(admin_password),
+                        "role": Role.CLIENT_ADMIN.value,
+                    },
+                )
+                await session.commit()
+        except IntegrityError as exc:
+            raise AppError(
+                message="User already exists for this tenant",
+                status_code=409,
+                code="user_conflict",
+            ) from exc
+
+        return UserRecord(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            email=normalized_email,
+            password_hash="",
+            role=Role.CLIENT_ADMIN,
+        )
+
+    async def authenticate(self, *, tenant_id: UUID, email: str, password: str) -> UserRecord:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            result = await session.execute(
+                text(
+                    """
+                    SELECT id, tenant_id, email, hashed_password, role
+                    FROM users
+                                        WHERE tenant_id = :tenant_id
+                      AND LOWER(email) = :email
+                      AND is_active = true
+                    LIMIT 1
+                    """
+                ),
+                {
+                                        "tenant_id": tenant_id,
+                    "email": _normalize_email(email),
+                },
+            )
+            mapped = result.mappings().first()
+
+        if mapped is None:
+            raise AppError(
+                message="Invalid credentials",
+                status_code=401,
+                code="invalid_credentials",
+            )
+
+        user = _map_user_row(mapped)
+        if not verify_password(password, user.password_hash):
+            raise AppError(
+                message="Invalid credentials",
+                status_code=401,
+                code="invalid_credentials",
+            )
+
+        return user
+
+    async def get_user_by_id(self, user_id: UUID) -> UserRecord | None:
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            result = await session.execute(
+                text(
+                    """
+                    SELECT id, tenant_id, email, hashed_password, role
+                    FROM users
+                                        WHERE id = :user_id
+                      AND is_active = true
+                    LIMIT 1
+                    """
+                ),
+                                {"user_id": user_id},
+            )
+            mapped = result.mappings().first()
+
+        if mapped is None:
+            return None
+        return _map_user_row(mapped)
+
+    async def revoke_refresh_jti(self, jti: str) -> None:
+        self._revoked_refresh_jti.add(jti)
+
+    async def is_refresh_revoked(self, jti: str) -> bool:
         return jti in self._revoked_refresh_jti
 
 
@@ -276,7 +478,11 @@ class AuthAttemptTracker:
 
 
 @lru_cache(maxsize=1)
-def get_auth_store() -> InMemoryAuthStore:
+def get_auth_store() -> AuthStore:
+    settings = get_auth_settings()
+    database_url = getattr(settings, "database_url", "")
+    if isinstance(database_url, str) and database_url.strip():
+        return PostgresAuthStore()
     return InMemoryAuthStore()
 
 
@@ -468,7 +674,7 @@ async def register_tenant(
         raise _rate_limited_error(scope="register", retry_after_seconds=retry_after_seconds)
 
     store = get_auth_store()
-    user = store.register_tenant_admin(
+    user = await store.register_tenant_admin(
         tenant_name=payload.tenant_name,
         admin_email=payload.admin_email,
         admin_password=payload.admin_password,
@@ -499,7 +705,7 @@ async def login(payload: LoginRequest, request: Request, response: Response) -> 
 
     store = get_auth_store()
     try:
-        user = store.authenticate(
+        user = await store.authenticate(
             tenant_id=payload.tenant_id,
             email=payload.email,
             password=payload.password,
@@ -545,7 +751,7 @@ async def refresh(payload: RefreshRequest, request: Request, response: Response)
     )
     token_payload = _decode_refresh_or_raise(settings=settings, token=refresh_token)
 
-    if store.is_refresh_revoked(token_payload.jti):
+    if await store.is_refresh_revoked(token_payload.jti):
         raise AppError(
             message="Refresh token has been revoked",
             status_code=401,
@@ -553,7 +759,7 @@ async def refresh(payload: RefreshRequest, request: Request, response: Response)
         )
 
     user_id = UUID(token_payload.sub)
-    user = store.get_user_by_id(user_id)
+    user = await store.get_user_by_id(user_id)
     if user is None:
         raise AppError(
             message="User not found",
@@ -561,7 +767,7 @@ async def refresh(payload: RefreshRequest, request: Request, response: Response)
             code="invalid_refresh_token",
         )
 
-    store.revoke_refresh_jti(token_payload.jti)
+    await store.revoke_refresh_jti(token_payload.jti)
     tokens = _issue_tokens(settings=settings, user=user)
     _set_auth_cookies(settings=settings, response=response, tokens=tokens)
     return tokens
@@ -579,7 +785,7 @@ async def logout(payload: LogoutRequest, request: Request, response: Response) -
         payload_token=payload.refresh_token,
     )
     token_payload = _decode_refresh_or_raise(settings=settings, token=refresh_token)
-    store.revoke_refresh_jti(token_payload.jti)
+    await store.revoke_refresh_jti(token_payload.jti)
     _clear_auth_cookies(settings=settings, response=response)
 
     return {"status": "logged_out"}

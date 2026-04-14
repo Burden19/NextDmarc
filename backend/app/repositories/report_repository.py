@@ -30,7 +30,7 @@ class ReportRepository:
                     SELECT id, tenant_id, domain_id, report_id, reporter_org,
                            date_range_begin, date_range_end, created_at
                     FROM dmarc_reports
-                    WHERE tenant_id = :tenant_id::uuid AND id = :id::uuid
+                    WHERE tenant_id = :tenant_id AND id = :id
                     """
                 ),
                 {"tenant_id": tenant_id, "id": report_db_id},
@@ -46,7 +46,7 @@ class ReportRepository:
         session_factory = get_session_factory()
         async with session_factory() as session:
             total_result = await session.execute(
-                text("SELECT COUNT(*) FROM dmarc_reports WHERE tenant_id = :tenant_id::uuid"),
+                text("SELECT COUNT(*) FROM dmarc_reports WHERE tenant_id = :tenant_id"),
                 {"tenant_id": tenant_id},
             )
             total = int(total_result.scalar_one())
@@ -57,7 +57,7 @@ class ReportRepository:
                     SELECT id, tenant_id, domain_id, report_id, reporter_org,
                            date_range_begin, date_range_end, created_at
                     FROM dmarc_reports
-                    WHERE tenant_id = :tenant_id::uuid
+                          WHERE tenant_id = :tenant_id
                     ORDER BY created_at DESC
                     OFFSET :offset LIMIT :limit
                     """
@@ -80,7 +80,7 @@ class ReportRepository:
                 text(
                     """
                     DELETE FROM dmarc_reports
-                    WHERE tenant_id = :tenant_id::uuid AND id = :id::uuid
+                    WHERE tenant_id = :tenant_id AND id = :id
                     RETURNING id
                     """
                 ),

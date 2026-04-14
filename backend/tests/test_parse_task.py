@@ -82,11 +82,17 @@ def test_parse_task_pipeline_reads_parses_persists_and_indexes(monkeypatch) -> N
     parser = FakeParser(parsed=parsed)
     persister = FakePersister()
     indexer = FakeIndexer()
+    queued_analysis_calls: list[tuple[str, dict[str, str]]] = []
 
     monkeypatch.setattr(parse_module, "_build_report_reader", lambda: reader)
     monkeypatch.setattr(parse_module, "_build_dmarc_parser", lambda: parser)
     monkeypatch.setattr(parse_module, "_build_report_persister", lambda: persister)
     monkeypatch.setattr(parse_module, "_build_report_indexer", lambda: indexer)
+    monkeypatch.setattr(
+        parse_module.celery_app,
+        "send_task",
+        lambda name, kwargs: queued_analysis_calls.append((name, kwargs)),
+    )
 
     result = asyncio.run(
         parse_module._parse_report_object_async(
@@ -102,12 +108,19 @@ def test_parse_task_pipeline_reads_parses_persists_and_indexes(monkeypatch) -> N
     assert persister.last_tenant_id == "tenant-1"
     assert persister.last_report is parsed
     assert len(indexer.calls) == 1
+    assert queued_analysis_calls == [
+        (
+            "app.workers.tasks.analysis.analyze_report_conformance",
+            {"tenant_id": "tenant-1", "report_db_id": "report-db-uuid"},
+        )
+    ]
     assert result == {
         "tenant_id": "tenant-1",
         "report_id": "report-1",
         "report_db_id": "report-db-uuid",
         "record_count": 1,
         "indexed_count": 1,
+        "analysis_enqueued": 1,
     }
 
 

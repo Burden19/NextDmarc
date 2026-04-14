@@ -27,3 +27,14 @@ Thumbs.db
 coverage/
 *.tsbuildinfo
 
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+backend/.coverage
+
+# Private/local ML data
+ML/datsets/
+ML/datasets/
+

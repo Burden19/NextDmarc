@@ -31,6 +31,16 @@ def _retry_delay_seconds(retry_count: int) -> int:
     return 300 if delay > 300 else delay
 
 
+def _queue_analysis_task(*, tenant_id: str, report_db_id: str) -> None:
+    celery_app.send_task(
+        "app.workers.tasks.analysis.analyze_report_conformance",
+        kwargs={
+            "tenant_id": tenant_id,
+            "report_db_id": report_db_id,
+        },
+    )
+
+
 @celery_app.task(bind=True, name="app.workers.tasks.parse.parse_report_object", max_retries=5)
 def parse_report_object(
     self: Task,
@@ -70,10 +80,13 @@ async def _parse_report_object_async(
         parsed=parsed,
     )
 
+    _queue_analysis_task(tenant_id=tenant_id, report_db_id=report_db_id)
+
     return {
         "tenant_id": tenant_id,
         "report_id": parsed.report_id,
         "report_db_id": report_db_id,
         "record_count": len(parsed.records),
         "indexed_count": indexed_count,
+        "analysis_enqueued": 1,
     }

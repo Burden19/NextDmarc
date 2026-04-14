@@ -32,14 +32,14 @@ class ReportPersister:
                     text(
                         """
                         INSERT INTO sources (id, tenant_id, ip, first_seen, last_seen)
-                        VALUES (:id, :tenant_id::uuid, :ip::inet, now(), now())
+                        VALUES (:id, :tenant_id, :ip, now(), now())
                         ON CONFLICT (tenant_id, ip)
                         DO UPDATE SET last_seen = now()
                         """
                     ),
                     {
-                        "id": str(uuid4()),
-                        "tenant_id": str(tenant_uuid),
+                        "id": uuid4(),
+                        "tenant_id": tenant_uuid,
                         "ip": record.source_ip,
                     },
                 )
@@ -48,12 +48,12 @@ class ReportPersister:
             return report_id
 
     async def _ensure_domain(self, *, session: AsyncSession, tenant_id: UUID, fqdn: str) -> str:
-        domain_id = str(uuid4())
+        domain_id = uuid4()
         result = await session.execute(
             text(
                 """
                 INSERT INTO domains (id, tenant_id, fqdn, status, created_at, updated_at)
-                VALUES (:id, :tenant_id::uuid, :fqdn, 'active', now(), now())
+                VALUES (:id, :tenant_id, :fqdn, 'active', now(), now())
                 ON CONFLICT (tenant_id, fqdn)
                 DO UPDATE SET updated_at = now()
                 RETURNING id
@@ -61,7 +61,7 @@ class ReportPersister:
             ),
             {
                 "id": domain_id,
-                "tenant_id": str(tenant_id),
+                "tenant_id": tenant_id,
                 "fqdn": fqdn,
             },
         )
@@ -76,7 +76,7 @@ class ReportPersister:
         domain_id: str,
         parsed: DmarcParsedReport,
     ) -> str:
-        report_pk = str(uuid4())
+        report_pk = uuid4()
         result = await session.execute(
             text(
                 """
@@ -92,8 +92,8 @@ class ReportPersister:
                 )
                 VALUES (
                     :id,
-                    :tenant_id::uuid,
-                    :domain_id::uuid,
+                    :tenant_id,
+                    :domain_id,
                     :report_id,
                     :reporter_org,
                     :date_range_begin,
@@ -111,7 +111,7 @@ class ReportPersister:
             ),
             {
                 "id": report_pk,
-                "tenant_id": str(tenant_id),
+                "tenant_id": tenant_id,
                 "domain_id": domain_id,
                 "report_id": parsed.report_id,
                 "reporter_org": parsed.provider_org_name,

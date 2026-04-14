@@ -8,13 +8,13 @@ from celery import Task
 from redis import Redis
 
 from app.core.config import get_settings
+from app.repositories.mailbox_repository import MailboxEntity, get_mailbox_repository
 from app.services.collector.attachment_decompressor import (
     AttachmentDecompressor,
     AttachmentPayload,
 )
-from app.services.collector.imap_client import ImapClient
+from app.services.collector.imap_client import ImapClient, resolve_imap_server
 from app.services.collector.minio_uploader import MinioUploader
-from app.services.mailbox_store import get_mailbox_store
 from app.workers.celery_app import celery_app
 
 RUN_LOCK_TTL_SECONDS = 300
@@ -33,6 +33,13 @@ def _build_uploader() -> MinioUploader:
     return MinioUploader()
 
 
+def _queue_parse_task(*, tenant_id: str, object_name: str) -> None:
+    # Import lazily to avoid task-module import cycles at startup.
+    from app.workers.tasks.parse import parse_report_object
+
+    parse_report_object.delay(tenant_id=tenant_id, object_name=object_name)
+
+
 def _build_redis_client() -> Redis:
     settings = get_settings()
     return Redis.from_url(settings.redis_url, decode_responses=True)
@@ -44,10 +51,22 @@ def _retry_delay_seconds(retry_count: int) -> int:
     return 300 if delay > 300 else delay
 
 
+def _apply_mailbox_server_override(*, imap_client: object, server: str | None) -> None:
+    if not server or not isinstance(imap_client, ImapClient):
+        return
+
+    settings = get_settings()
+    host, port, use_ssl = resolve_imap_server(
+        server=server,
+        default_port=settings.imap_port,
+        default_use_ssl=settings.imap_use_ssl,
+    )
+    imap_client.configure_connection(host=host, port=port, use_ssl=use_ssl)
+
+
 @celery_app.task(name="app.workers.tasks.collect.poll_active_mailboxes")
 def poll_active_mailboxes() -> dict[str, int]:
-    mailbox_store = get_mailbox_store()
-    enabled_mailboxes = mailbox_store.list_enabled()
+    enabled_mailboxes = asyncio.run(_list_enabled_mailboxes())
 
     queued = 0
     for mailbox in enabled_mailboxes:
@@ -56,11 +75,17 @@ def poll_active_mailboxes() -> dict[str, int]:
             mailbox_id=str(mailbox.id),
             username=mailbox.username,
             password=mailbox.password,
+            server=mailbox.server,
             mailbox=mailbox.mailbox,
         )
         queued += 1
 
     return {"queued_mailboxes": queued}
+
+
+async def _list_enabled_mailboxes() -> list[MailboxEntity]:
+    mailbox_repository = get_mailbox_repository()
+    return await mailbox_repository.list_enabled()
 
 
 @celery_app.task(bind=True, name="app.workers.tasks.collect.collect_mailbox_reports", max_retries=5)
@@ -71,6 +96,7 @@ def collect_mailbox_reports(
     mailbox_id: str,
     username: str,
     password: str,
+    server: str | None = None,
     mailbox: str = "INBOX",
 ) -> dict[str, int]:
     try:
@@ -80,6 +106,7 @@ def collect_mailbox_reports(
                 mailbox_id=mailbox_id,
                 username=username,
                 password=password,
+                server=server,
                 mailbox=mailbox,
             )
         )
@@ -94,6 +121,7 @@ async def _collect_mailbox_reports_async(
     mailbox_id: str,
     username: str,
     password: str,
+    server: str | None = None,
     mailbox: str,
 ) -> dict[str, int]:
     redis_client = _build_redis_client()
@@ -116,6 +144,7 @@ async def _collect_mailbox_reports_async(
 
     try:
         imap_client = _build_imap_client()
+        _apply_mailbox_server_override(imap_client=imap_client, server=server)
         decompressor = _build_decompressor()
         uploader = _build_uploader()
 
@@ -177,6 +206,8 @@ async def _collect_mailbox_reports_async(
                         payload=item.content,
                         content_type=_guess_content_type(item.filename),
                     )
+                    if _is_xml_payload(item.filename) or _looks_like_xml_payload(item.content):
+                        _queue_parse_task(tenant_id=tenant_id, object_name=object_name)
                     uploaded_objects += 1
 
             processed_messages += 1
@@ -218,8 +249,31 @@ def _extract_attachments(raw_message: bytes) -> list[AttachmentPayload]:
         if not isinstance(payload, bytes):
             continue
 
-        filename = part.get_filename() or "attachment.bin"
+        content_type = (part.get_content_type() or "application/octet-stream").lower()
+        filename = part.get_filename() or _default_attachment_filename(content_type=content_type)
         attachments.append(AttachmentPayload(filename=filename, content=payload))
+
+    # Some providers place DMARC XML in an inline body part instead of using
+    # Content-Disposition: attachment.
+    if not attachments:
+        for part in message.walk():
+            if part.is_multipart():
+                continue
+
+            content_type = (part.get_content_type() or "").lower()
+            payload = part.get_payload(decode=True)
+            if not isinstance(payload, bytes):
+                continue
+
+            if not _is_xml_content_type(content_type) and not _looks_like_xml_payload(payload):
+                continue
+
+            attachments.append(
+                AttachmentPayload(
+                    filename=_default_attachment_filename(content_type=content_type),
+                    content=payload,
+                )
+            )
 
     return attachments
 
@@ -248,3 +302,30 @@ def _guess_content_type(filename: str) -> str:
     if lower.endswith(".csv"):
         return "text/csv"
     return "application/octet-stream"
+
+
+def _is_xml_payload(filename: str) -> bool:
+    return filename.lower().endswith(".xml")
+
+
+def _is_xml_content_type(content_type: str) -> bool:
+    normalized = content_type.lower()
+    return normalized in {"application/xml", "text/xml"} or normalized.endswith("+xml")
+
+
+def _default_attachment_filename(*, content_type: str) -> str:
+    normalized = content_type.lower()
+    if _is_xml_content_type(normalized):
+        return "attachment.xml"
+    if normalized in {"application/gzip", "application/x-gzip"}:
+        return "attachment.gz"
+    if normalized in {"application/zip", "application/x-zip-compressed"}:
+        return "attachment.zip"
+    return "attachment.bin"
+
+
+def _looks_like_xml_payload(payload: bytes) -> bool:
+    head = payload.lstrip()[:512].lower()
+    if not head:
+        return False
+    return head.startswith(b"<?xml") or head.startswith(b"<feedback")
